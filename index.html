@@ -1,0 +1,2706 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pi Agent 源码学习之旅</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg-soft: #161b22;
+    --bg-code: #1c2129;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #d2a8ff;
+    --green: #3fb950;
+    --orange: #d29922;
+    --red: #f85149;
+    --py: #3572A5;
+    --ts: #3178c6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.75;
+  }
+  .layout { display: flex; min-height: 100vh; }
+
+  /* ---- Sidebar ---- */
+  aside {
+    width: 280px; flex-shrink: 0;
+    background: var(--bg-soft);
+    border-right: 1px solid var(--border);
+    padding: 24px 0;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  .brand { padding: 0 20px 20px; border-bottom: 1px solid var(--border); }
+  .brand-row { display: flex; justify-content: space-between; align-items: flex-start; }
+  #nav-hide {
+    background: transparent; color: var(--text-dim); border: 1px solid var(--border);
+    border-radius: 6px; font-size: 13px; font-family: inherit;
+    width: 24px; height: 24px; cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #nav-hide:hover { color: var(--text); border-color: var(--text-dim); }
+  #nav-show {
+    position: fixed; left: 0; top: 50%; transform: translateY(-50%); z-index: 80;
+    background: var(--bg-soft); color: var(--text-dim);
+    border: 1px solid var(--border); border-left: none;
+    border-radius: 0 8px 8px 0;
+    font-size: 16px; font-family: inherit;
+    width: 26px; height: 56px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 2px 0 10px rgba(0,0,0,.3);
+    transition: width .15s, color .15s;
+  }
+  #nav-show:hover { color: var(--accent); width: 32px; }
+  #nav-show.hidden { display: none; }
+  aside.collapsed { display: none; }
+  .brand h1 { font-size: 17px; font-weight: 700; }
+  .brand p { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+  .progress-wrap { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+  .progress-label { font-size: 12px; color: var(--text-dim); display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); width: 0%; transition: width .4s; }
+  nav { padding: 12px 0; }
+  .nav-item { display: block; padding: 10px 20px; cursor: pointer; border-left: 3px solid transparent; }
+  .nav-item:hover { background: rgba(88,166,255,.08); }
+  .nav-item.active { border-left-color: var(--accent); background: rgba(88,166,255,.12); }
+  .nav-item .nav-title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .nav-item .nav-sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .nav-item .check { color: var(--green); font-size: 13px; }
+  .nav-item.locked { opacity: .45; cursor: default; }
+  .nav-item.locked:hover { background: none; }
+
+  /* ---- Main ---- */
+  main { flex: 1; display: flex; gap: 40px; align-items: flex-start; padding: 48px 40px 120px; }
+  .article { flex: 1; min-width: 0; max-width: 900px; }
+  .lesson-header { margin-bottom: 32px; }
+  .lesson-tag { font-size: 12px; color: var(--accent); font-weight: 700; letter-spacing: 2px; }
+  .lesson-header h2 { font-size: 28px; margin: 6px 0 8px; }
+  .lesson-header .meta { color: var(--text-dim); font-size: 13px; }
+  h3 { font-size: 20px; margin: 40px 0 14px; padding-top: 24px; border-top: 1px solid var(--border); }
+  h4 { font-size: 16px; margin: 28px 0 10px; color: var(--accent2); }
+  p { margin: 10px 0; }
+  ul, ol { margin: 10px 0 10px 24px; }
+  li { margin: 6px 0; }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: .88em;
+    background: var(--bg-code);
+    padding: 2px 6px; border-radius: 4px;
+    color: #79c0ff;
+  }
+  pre {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.65;
+  }
+  pre code { background: none; padding: 0; color: var(--text); }
+  .pre-wrap { margin: 14px 0; }
+  .file-ref {
+    display: inline-block;
+    font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+    background: rgba(88,166,255,.12); color: var(--accent);
+    padding: 2px 8px; border-radius: 4px; margin: 2px 0;
+  }
+
+  /* Python vs TS 对照块 */
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+  .pair .cell { min-width: 0; }
+  .pair .lang {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+    padding: 4px 10px; border-radius: 6px 6px 0 0; display: inline-block;
+  }
+  .pair .lang.py { background: rgba(53,114,165,.3); color: #6cb6ff; }
+  .pair .lang.ts { background: rgba(49,120,198,.3); color: #79c0ff; }
+  .pair pre { border-radius: 0 8px 8px 8px; height: 100%; }
+  .pair .cell { display: flex; flex-direction: column; }
+  .pair .cell pre { flex: 1; }
+  @media (max-width: 1100px) { .pair { grid-template-columns: 1fr; } }
+
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: rgba(88,166,255,.08);
+    padding: 12px 16px; border-radius: 0 8px 8px 0;
+    margin: 16px 0; font-size: 14px;
+  }
+  .callout.warn { border-left-color: var(--orange); background: rgba(210,153,34,.08); }
+  .callout.key { border-left-color: var(--green); background: rgba(63,185,80,.08); }
+  .callout.danger { border-left-color: var(--red); background: rgba(248,81,73,.08); }
+  .callout strong { color: var(--text); }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
+  th { background: var(--bg-soft); font-size: 13px; }
+  td { font-size: 13.5px; }
+
+  .section-head { display: flex; align-items: center; gap: 12px; }
+  .sec-status { font-weight: 700; color: var(--green); font-size: 15px; }
+  .sec-status.pending { color: var(--border); }
+  .section-tail { display: flex; margin: 26px 0 4px; }
+  .section-tail .done-btn {
+    width: 100%; padding: 11px; font-size: 14px; border-radius: 10px;
+    background: var(--bg-soft); border: 1px dashed var(--text-dim); color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+  .section-tail .done-btn:hover { border-color: var(--green); color: var(--green); border-style: solid; }
+  .section-tail .done-btn.done {
+    background: var(--green); border: 1px solid var(--green); color: #0d1117;
+    font-weight: 700; letter-spacing: 0;
+  }
+  .section-tail .done-btn:disabled { opacity: .45; cursor: not-allowed; }
+  .section-tail .done-btn:disabled:hover { border-color: var(--text-dim); color: var(--text-dim); border-style: dashed; }
+
+  /* ---- 章节测验 ---- */
+  .quiz {
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 20px; margin: 24px 0 6px; background: var(--bg-soft);
+  }
+  .quiz-title { font-size: 13px; font-weight: 700; color: var(--accent2); margin-bottom: 6px; }
+  .quiz-q { margin: 14px 0; }
+  .quiz-q .q-text { font-size: 14px; margin-bottom: 8px; }
+  .quiz-opt {
+    display: flex; gap: 8px; align-items: baseline;
+    padding: 6px 10px; border-radius: 6px; cursor: pointer;
+    font-size: 13.5px; color: var(--text-dim);
+  }
+  .quiz-opt:hover { background: rgba(88,166,255,.08); }
+  .quiz-opt input { accent-color: var(--accent); margin-top: 2px; flex-shrink: 0; }
+  .quiz-opt.correct { background: rgba(63,185,80,.15); color: var(--green); }
+  .quiz-opt.wrong { background: rgba(248,81,73,.12); color: var(--red); }
+  .quiz-explain { font-size: 12.5px; color: var(--text-dim); margin: 6px 0 0 28px; }
+  .quiz-actions { margin-top: 12px; display: flex; gap: 12px; align-items: center; }
+  .quiz-submit {
+    background: var(--accent); color: #0d1117; border: none; border-radius: 6px;
+    font-size: 13px; font-weight: 700; font-family: inherit;
+    padding: 6px 16px; cursor: pointer;
+  }
+  .quiz-submit:hover { filter: brightness(1.15); }
+  .quiz-status { font-size: 13px; }
+  .quiz-status.pass { color: var(--green); font-weight: 700; }
+  .quiz-status.fail { color: var(--orange); }
+  .done-btn {
+    flex-shrink: 0;
+    font-size: 12px; font-family: inherit;
+    background: transparent; color: var(--text-dim);
+    border: 1px solid var(--border); border-radius: 20px;
+    padding: 3px 12px; cursor: pointer;
+    transition: all .2s;
+  }
+  .done-btn:hover { border-color: var(--green); color: var(--green); }
+  .done-btn.done { background: var(--green); border-color: var(--green); color: #0d1117; font-weight: 700; }
+
+  .homework {
+    border: 1px dashed var(--orange);
+    border-radius: 10px; padding: 20px 22px; margin: 20px 0;
+    background: rgba(210,153,34,.05);
+  }
+  .homework h4 { margin-top: 0; color: var(--orange); }
+  .hw-check { display: flex; align-items: flex-start; gap: 10px; margin: 12px 0; cursor: pointer; }
+  .hw-check input { margin-top: 5px; accent-color: var(--green); width: 16px; height: 16px; cursor: pointer; }
+  .hw-check span { flex: 1; }
+
+  footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 12px; }
+
+  /* ---- 本课目录（TOC） ---- */
+  .toc {
+    width: 200px; flex-shrink: 0;
+    position: sticky; top: 32px;
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    font-size: 13px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .toc::-webkit-scrollbar { width: 6px; }
+  .toc::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .toc::-webkit-scrollbar-track { background: transparent; }
+  .toc-title {
+    font-size: 11px; letter-spacing: 1.5px; color: var(--text-dim);
+    margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  .toc-item {
+    display: flex; gap: 8px; align-items: baseline;
+    padding: 5px 0; cursor: pointer; color: var(--text-dim);
+  }
+  .toc-item:hover { color: var(--text); }
+  .toc-item.done { color: var(--text); }
+  .toc-item .toc-check { width: 14px; flex-shrink: 0; color: var(--green); font-weight: 700; }
+
+  /* ---- 代码高亮（自配 hljs 主题） ---- */
+  .hljs-keyword, .hljs-selector-tag { color: #ff7b72; }
+  .hljs-string, .hljs-doctag { color: #a5d6ff; }
+  .hljs-number, .hljs-literal { color: #79c0ff; }
+  .hljs-comment, .hljs-quote { color: #8b949e; font-style: italic; }
+  .hljs-title, .hljs-title.function_ { color: #d2a8ff; }
+  .hljs-title.class_, .hljs-type { color: #ffa657; }
+  .hljs-built_in, .hljs-attr, .hljs-attribute { color: #79c0ff; }
+  .hljs-variable, .hljs-template-variable { color: #ffa657; }
+
+  /* ---- Playground（右侧常驻面板） ---- */
+  #pg-fab {
+    position: fixed; right: 24px; bottom: 24px; z-index: 90;
+    background: var(--accent); color: #0d1117; border: none; border-radius: 24px;
+    font-size: 13px; font-weight: 700; font-family: inherit;
+    padding: 10px 18px; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  }
+  #pg-fab:hover { background: #79c0ff; }
+  #pg-panel {
+    width: 460px; flex-shrink: 0;
+    position: sticky; top: 0; height: 100vh;
+    background: var(--bg-soft); border-left: 1px solid var(--border);
+    display: flex; flex-direction: column;
+  }
+  #pg-panel.pg-hidden { display: none; }
+  #pg-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  #pg-header .pg-title { font-size: 14px; font-weight: 700; }
+  #pg-header .pg-title span { color: var(--text-dim); font-weight: 400; font-size: 12px; margin-left: 8px; }
+  #pg-run {
+    background: var(--green); color: #0d1117; border: none; border-radius: 6px;
+    font-size: 12px; font-weight: 700; font-family: inherit;
+    padding: 6px 14px; cursor: pointer; margin-right: 8px;
+  }
+  #pg-run:hover { filter: brightness(1.15); }
+  #pg-close {
+    background: transparent; color: var(--text-dim); border: 1px solid var(--border);
+    border-radius: 6px; font-size: 12px; padding: 6px 10px; cursor: pointer;
+  }
+  #pg-close:hover { color: var(--text); border-color: var(--text-dim); }
+  /* 编辑器：透明 textarea 盖在高亮层上 */
+  #pg-editor-wrap {
+    position: relative; flex: 1; min-height: 260px;
+    border-bottom: 1px solid var(--border); overflow: hidden;
+  }
+  #pg-editor-wrap pre, #pg-editor {
+    margin: 0; font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 13px; line-height: 1.65; padding: 14px 16px;
+    tab-size: 2; white-space: pre; overflow: auto;
+  }
+  #pg-editor-wrap pre {
+    position: absolute; inset: 0; pointer-events: none;
+    border: none; border-radius: 0; background: var(--bg-code);
+  }
+  /* 抵消全局 code 样式，保证高亮层和 textarea 字体度量完全一致 */
+  #pg-highlight {
+    font-size: inherit; font-family: inherit; line-height: inherit;
+    padding: 0; background: none; color: var(--text);
+  }
+  #pg-editor {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    margin: 0;
+    background: transparent; color: transparent; caret-color: #e6edf3;
+    border: none; outline: none; resize: none;
+  }
+  #pg-editor::selection { background: rgba(88,166,255,.3); }
+  /* 代码补全下拉 */
+  #pg-complete {
+    position: absolute; z-index: 5; min-width: 160px; max-height: 180px; overflow: auto;
+    background: var(--bg-soft); border: 1px solid var(--accent); border-radius: 8px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.5);
+  }
+  #pg-complete.pg-hidden { display: none; }
+  .pg-ci { padding: 4px 12px; cursor: pointer; color: var(--text); white-space: nowrap; }
+  .pg-ci.active { background: var(--accent); color: #0d1117; font-weight: 700; }
+  #pg-output-label { font-size: 11px; color: var(--text-dim); padding: 8px 16px 0; letter-spacing: 1.5px; flex-shrink: 0; }
+  #pg-output {
+    height: 200px; min-height: 80px; max-height: 50vh; flex-shrink: 0;
+    overflow: auto; resize: vertical;
+    margin: 0; border: none;
+    border-radius: 0; white-space: pre-wrap; word-break: break-word;
+    background: var(--bg-soft); color: var(--green);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  #pg-output::-webkit-scrollbar { width: 6px; height: 6px; }
+  #pg-output::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  #pg-output::-webkit-scrollbar-track { background: transparent; }
+  pre[data-playground] { position: relative; }
+  .pg-open-btn {
+    position: absolute; top: 8px; right: 8px;
+    background: rgba(88,166,255,.15); color: var(--accent);
+    border: 1px solid rgba(88,166,255,.4); border-radius: 6px;
+    font-size: 11px; font-weight: 700; font-family: inherit;
+    padding: 3px 10px; cursor: pointer; opacity: .85;
+  }
+  .pg-open-btn:hover { background: var(--accent); color: #0d1117; opacity: 1; }
+  /* 窄屏时面板退化为浮层 */
+  @media (max-width: 1400px) {
+    #pg-panel {
+      position: fixed; right: 0; top: 0; z-index: 100;
+      width: min(480px, 92vw); box-shadow: -8px 0 24px rgba(0,0,0,.5);
+    }
+  }
+  .kbd { font-family: monospace; background: var(--bg-code); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; font-size: 12px; }
+  .article a { color: var(--accent); text-decoration: none; }
+  .article a:hover { text-decoration: underline; }
+
+  @media (max-width: 860px) {
+    aside { display: none; }
+    main { padding: 24px 20px 80px; }
+  }
+  @media (max-width: 1200px) {
+    .toc { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <div class="brand">
+      <div class="brand-row">
+        <h1>Pi Agent 源码学习之旅</h1>
+        <button id="nav-hide" title="隐藏侧边栏（⌘/Ctrl+B）">«</button>
+      </div>
+      <p>从 Python 开发者到 Agent 产品工程师</p>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-label"><span>总进度</span><span id="progress-pct">0%</span></div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    </div>
+    <nav id="nav"></nav>
+  </aside>
+
+  <main id="content"></main>
+
+  <div id="pg-panel" class="pg-hidden">
+    <div id="pg-header">
+      <div class="pg-title">TS Playground<span>类型擦掉后执行 · 纯语言实验</span></div>
+      <div>
+        <button id="pg-run">▶ 运行 ⌘↵</button>
+        <button id="pg-close">✕</button>
+      </div>
+    </div>
+    <div id="pg-editor-wrap">
+      <pre aria-hidden="true"><code id="pg-highlight"></code></pre>
+      <textarea id="pg-editor" spellcheck="false"></textarea>
+      <div id="pg-complete" class="pg-hidden"></div>
+    </div>
+    <div id="pg-output-label">输出</div>
+    <pre id="pg-output"></pre>
+  </div>
+</div>
+
+<button id="nav-show" class="hidden" title="展开课程目录（⌘/Ctrl+B）">»</button>
+<button id="pg-fab" title="切换 Playground（Ctrl+`）">▶ Playground</button>
+<script src="vendor/highlight.min.js"></script>
+
+<script>
+// ===================== 课程数据 =====================
+const LESSONS = [
+  // ============================================================
+  // 第 1 课：TypeScript 速成
+  // ============================================================
+  {
+    id: "lesson-ts",
+    title: "第 1 课 · TypeScript 速成",
+    sub: "以 Python 开发者的视角",
+    html: `
+<div class="lesson-header">
+  <div class="lesson-tag">LESSON 01</div>
+  <h2>TypeScript 速成：以 Python 开发者的视角</h2>
+  <div class="meta">目标：能流畅阅读 pi 源码 · 不是学会"写漂亮的 TS"，而是建立阅读词汇</div>
+</div>
+
+<div class="callout key">
+  <strong>最重要的一句话：</strong>TypeScript = JavaScript + 一层只在编译期存在的类型注解。
+  类型检查通过后会被<strong>全部擦除</strong>，运行时一行类型都不剩。
+  所以 TS 的类型不能校验运行时数据（比如网络返回的 JSON），这一点和 Python 的 pydantic 完全不同，后面会反复强调。
+</div>
+
+<h3 id="ts-s1"><div class="section-head">1 · 模块与变量 <button class="done-btn" data-section="ts-s1">标记完成</button></div></h3>
+
+<p>TS 的模块系统和 Python 几乎一一对应：</p>
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON</span><pre><code># agent_loop.py
+from .types import AgentContext, AgentEvent
+from .stream_fn import get_default_stream_fn
+
+MAX_RETRIES = 3
+result = None</code></pre></div>
+  <div class="cell"><span class="lang ts">TYPESCRIPT</span><pre><code>// agent-loop.ts
+import { type AgentContext, type AgentEvent } from "./types.ts";
+import { getDefaultStreamFn } from "./stream-fn.ts";
+
+const MAX_RETRIES = 3;
+let result = null;</code></pre></div>
+</div>
+<ul>
+  <li><code>const</code> ≈ Python 的"约定不改的变量"（≈ 没有 <code>final</code> 时的习惯），<code>let</code> ≈ 普通变量。<strong>永远不用 <code>var</code></strong>（历史遗留）。</li>
+  <li><code>import { type X }</code> 里的 <code>type</code> 关键字表示"只导入类型，运行时不导入"——因为类型编译后会被擦除。</li>
+  <li>注意 pi 的 import 路径带 <code>.ts</code> 后缀（<code>"./stream-fn.ts"</code>）。这是 Node 的"strip types"新模式：直接运行 TS 源码，类型当注释删掉。多数项目写 <code>"./stream-fn"</code>，本仓库特殊。</li>
+  <li>每个文件就是一个模块，<code>export</code> 什么别人才能 import 什么——比 Python 的"下划线约定"严格。</li>
+  <li>相等比较用 <code>===</code>（严格相等，无隐式类型转换），<strong>永远不用 <code>==</code></strong>。Python 没有对应的坑，记住即可。</li>
+</ul>
+
+<h3 id="ts-s2b"><div class="section-head">2 · 常用数据类型声明：数组、字典、集合 <button class="done-btn" data-section="ts-s2b">标记完成</button></div></h3>
+
+<p>好消息：声明大多能省略（编译器从字面量推断）。你真正要学的是"需要写的时候怎么写"和"运行时怎么判断"。</p>
+
+<h4>数组 ≈ list</h4>
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON</span><pre><code>names: list[str] = ["a", "b"]
+mixed: list[str | int] = ["a", 1]
+grid: list[list[int]] = [[1, 2], [3]]</code></pre></div>
+  <div class="cell"><span class="lang ts">TYPESCRIPT</span><pre><code>const names: string[] = ["a", "b"];          // 后缀 []
+const mixed: (string | number)[] = ["a", 1]; // union 数组要加括号！
+const grid: number[][] = [[1, 2], [3]];
+// Array&lt;string&gt; 也完全等价，但 [] 更常见
+// 实际代码通常不标注：const names = ["a", "b"];
+// 编译器自动推断为 string[]</code></pre></div>
+</div>
+
+<h4>字典：两种形态，别混用</h4>
+<p><strong>形态 1：字段名已知</strong> → interface + 对象字面量（第 2 节的内容）。<strong>形态 2：键名运行时才确定</strong> → <code>Record</code> 或 <code>Map</code>：</p>
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON</span><pre><code>counts: dict[str, int] = {}
+counts["a.wav"] = 3
+
+by_id: dict[int, str] = {}
+by_id[1] = "kick.wav"</code></pre></div>
+  <div class="cell"><span class="lang ts">TYPESCRIPT</span><pre><code>const counts: Record&lt;string, number&gt; = {};
+counts["a.wav"] = 3;
+
+// 需要非字符串键 → 用 Map（dict 的完整对应物）
+const byId = new Map&lt;number, string&gt;();
+byId.set(1, "kick.wav");
+byId.get(1);   // "kick.wav"
+byId.has(2);   // false</code></pre></div>
+</div>
+<div class="callout warn">
+  <strong>对象当字典用的坑：</strong>JS 对象的键<strong>永远被转成字符串</strong>——<code>obj[1]</code> 存的其实是 <code>"1"</code>。
+  Map 保留键的原始类型。规则：键是固定字段用对象/interface，键是动态数据用 Map。
+</div>
+
+<h4>集合 ≈ set</h4>
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON</span><pre><code>seen: set[str] = set()
+seen.add("a.wav")
+"a.wav" in seen        # True
+list(seen)             # 转回列表
+list({"x", "y", "x"})  # 去重</code></pre></div>
+  <div class="cell"><span class="lang ts">TYPESCRIPT</span><pre><code>const seen = new Set&lt;string&gt;();
+seen.add("a.wav");
+seen.has("a.wav");      // true
+[...seen];              // 转回数组
+[...new Set(["x", "y", "x"])];  // 数组去重一行流</code></pre></div>
+</div>
+
+<h4>元组 ≈ tuple（定长、每位置类型固定）</h4>
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON</span><pre><code>point: tuple[int, int] = (120, -6)</code></pre></div>
+  <div class="cell"><span class="lang ts">TYPESCRIPT</span><pre><code>const point: [number, number] = [120, -6];
+// 普通数组 = 同种元素任意长度；元组 = 定长异构</code></pre></div>
+</div>
+
+<h4>运行时判断类型的坑（typeof 家族）</h4>
+<div class="pre-wrap"><pre data-playground><code>console.log(typeof []);         // "object"  ← 坑！
+console.log(typeof {});         // "object"
+console.log(typeof null);       // "object"  ← JS 著名历史 bug
+console.log(typeof "a");        // "string"
+console.log(typeof 1);          // "number"
+console.log(typeof undefined);  // "undefined"
+
+// 判断数组必须用 Array.isArray：
+console.log(Array.isArray([])); // true
+console.log(Array.isArray({})); // false</code></pre></div>
+
+<h4>速查表</h4>
+<table>
+  <tr><th>需求</th><th>Python</th><th>TypeScript</th></tr>
+  <tr><td>数组</td><td><code>list[str]</code></td><td><code>string[]</code> / <code>Array&lt;string&gt;</code></td></tr>
+  <tr><td>动态键字典</td><td><code>dict[str, int]</code></td><td><code>Record&lt;string, number&gt;</code> 或 <code>Map&lt;string, number&gt;</code></td></tr>
+  <tr><td>集合</td><td><code>set[str]</code></td><td><code>Set&lt;string&gt;</code></td></tr>
+  <tr><td>定长异构</td><td><code>tuple[str, int]</code></td><td><code>[string, number]</code></td></tr>
+  <tr><td>取默认值</td><td><code>d.get(k, 0)</code></td><td><code>obj[k] ?? 0</code> / <code>map.get(k) ?? 0</code></td></tr>
+  <tr><td>遍历字典</td><td><code>d.items()</code></td><td><code>Object.entries(obj)</code> / <code>map.entries()</code></td></tr>
+  <tr><td>遍历键 / 值</td><td><code>d.keys()</code> / <code>d.values()</code></td><td><code>Object.keys(obj)</code> / <code>Object.values(obj)</code></td></tr>
+</table>
+
+<p><strong>亲手试一下</strong>（≈ Python 的 <code>collections.Counter</code> 和 dict 键类型坑，点"▶ 试一试"。里面的 <code>for...of</code> ≈ Python 的 <code>for...in</code>，先直觉使用，第 8 节系统讲）：</p>
+<div class="pre-wrap"><pre data-playground><code>// ≈ Counter：统计素材出现次数
+const counts: Record&lt;string, number&gt; = {};
+for (const name of ["a.wav", "b.wav", "a.wav"]) {
+  counts[name] = (counts[name] ?? 0) + 1;  // ?? 0 ≈ dict.get(name, 0)
+}
+console.log("计数:", counts);
+
+// 对象键被转成字符串的现场
+const obj: Record&lt;string, string&gt; = {};
+obj[1] = "one";   // 你写的是数字 1…
+console.log("对象的键:", Object.keys(obj), typeof Object.keys(obj)[0]);
+
+// Map 保留键的类型
+const map = new Map();
+map.set(1, "one");
+console.log("Map 的键:", [...map.keys()], typeof [...map.keys()][0]);
+
+// 实验：把 counts 换成 Map 重写一遍（set/get/has），体会两种写法的差异</code></pre></div>
+
+<h3 id="ts-s2"><div class="section-head">3 · 对象、interface 与结构类型 <button class="done-btn" data-section="ts-s2">标记完成</button></div></h3>
+
+<p>JS 的对象字面量 ≈ Python 的 dict，但键不用引号，访问统一用点号：</p>
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON</span><pre><code>msg = {
+    "role": "user",
+    "content": "你好",
+    "timestamp": 1717000000000,
+}
+print(msg["role"])</code></pre></div>
+  <div class="cell"><span class="lang ts">TYPESCRIPT</span><pre><code>const msg = {
+  role: "user",
+  content: "你好",
+  timestamp: 1717000000000,
+};
+console.log(msg.role);</code></pre></div>
+</div>
+
+<p><code>interface</code> 描述对象的"形状"。它最接近 Python 的 <code>TypedDict</code> 或 <code>@dataclass</code>，但有一个本质区别——<strong>结构类型</strong>：</p>
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON（名义类型）</span><pre><code>class UserMessage(BaseModel):
+    role: str
+    content: str
+    timestamp: int
+
+# 必须是 UserMessage 的实例
+# 才算 UserMessage</code></pre></div>
+  <div class="cell"><span class="lang ts">TYPESCRIPT（结构类型）</span><pre><code>interface UserMessage {
+  role: "user";
+  content: string | (TextContent | ImageContent)[];
+  timestamp: number;  // 毫秒 Unix 时间戳
+}
+
+// 任何"形状吻合"的对象都算 UserMessage，
+// 不需要 new、不需要继承</code></pre></div>
+</div>
+<p>上面这段是 <span class="file-ref">packages/ai/src/types.ts</span> 里的真实代码。要点：</p>
+<ul>
+  <li><code>role: "user"</code> —— 类型不是 <code>string</code>，而是<strong>字面量 "user" 本身</strong>。这个字段只能是这个字符串。这是 TS 类型系统最好用的武器，下一节详讲。</li>
+  <li><code>|</code> 是"或"（union），≈ Python 3.10+ 的 <code>str | list[...]</code>。</li>
+  <li><code>(TextContent | ImageContent)[]</code> —— 后缀 <code>[]</code> 表示数组，≈ <code>list[TextContent | ImageContent]</code>。</li>
+  <li>可选字段用 <code>?</code>：<code>textSignature?: string</code> 表示这个字段可以不存在（不是 <code>string | None</code>，是"键可以整个缺失"）。</li>
+</ul>
+
+<div class="callout">
+  <strong>结构类型 vs 名义类型</strong>是 TS 和 Python(pydantic/mypy) 思维最大的差异：
+  TS 里"鸭子类型"是官方特性——形状对就是同一类型，跟类名无关。所以 pi 源码里很少见到 class，全是 interface + 对象字面量。
+</div>
+
+<h4>追问：什么叫"运行时不存在的形状"？（Q&A 实录）</h4>
+<p>先看一个可运行的实验（保存为 demo.ts，<code>node --experimental-strip-types demo.ts</code> 直接跑）：</p>
+<div class="pre-wrap"><pre data-playground><code>interface TextContent {
+  type: "text";
+  text: string;
+}
+
+function describe(c: TextContent): string {
+  return \`[\${c.type}] \${c.text}\`;
+}
+
+// 注意：没有任何 new、没有任何类
+const msg = { type: "text", text: "你好" };
+console.log(describe(msg));           // → [text] 你好
+
+// console.log(msg instanceof TextContent);
+// ↑ 取消注释会【直接报错】：TextContent 只被用作类型，运行时不存在这个东西
+
+console.log(typeof msg);  // → "object"，仅此而已</code></pre></div>
+
+<p>这个实验说明了三件事：</p>
+<ol>
+  <li><strong><code>interface</code> 编译后产出 0 字节的 JavaScript。</strong>运行时没有 <code>TextContent</code>——没有类、没有构造函数、没有注册表。<code>instanceof</code> 它不是返回 false，而是语法错误：你无法对一个不存在的概念提问。</li>
+  <li><strong>"形状"= 兼容性只看字段结构，不看出身。</strong><code>msg</code> 没有任何 <code>new</code>，但编译通过——编译器检查的是"有没有 <code>type</code> 和 <code>text</code> 字段、类型对不对"，不是"哪个类生的"。</li>
+  <li><strong>运行时的 msg 就是个裸对象</strong>，所有类型信息在编译完成的那一刻全部蒸发。</li>
+</ol>
+
+<div class="callout">
+  <strong>Python 里的同款概念：</strong><code>TypedDict</code> 也只活在 mypy 里，运行时 <code>isinstance</code> 同样报错。
+  TS 的区别是：<strong>整个语言都按这个哲学设计</strong>，而不只是 TypedDict 一个角落。
+</div>
+
+<h4>再追问：这样设计有什么用？</h4>
+<ul>
+  <li><strong>① 给"别人家的数据"贴类型标签。</strong>JS 世界的数据大多以 JSON 流动（HTTP 响应、配置文件、<strong>LLM 返回的消息</strong>），来自 <code>JSON.parse()</code>，没法要求它们 <code>instanceof</code> 你的类。结构类型让你依然能精确描述：<code>AssistantMessage</code> 描述的正是 LLM API 返回的 JSON 形状，parse 完直接当它用。</li>
+  <li><strong>② 零成本。</strong>pi 的 <span class="file-ref">types.ts</span> 有 815 行类型定义，编译后贡献的运行时代码是<strong>零</strong>。对比 pydantic：每个模型都是真实的运行时类，有开销、有构造逻辑。</li>
+  <li><strong>③ 解耦。</strong>函数声明"我要一个 <code>{ name: string }</code>"，任何人都能传，不需要继承同一个基类。pi 的 JS 扩展系统能工作就靠这个：你的扩展产出一个形状吻合的对象，就是合法工具。</li>
+  <li><strong>④ 测试友好。</strong>测试里直接写对象字面量就是合法 <code>UserMessage</code>，不用 mock 框架。</li>
+</ul>
+
+<h4>精确化一个常见表述</h4>
+<div class="callout warn">
+  <strong>"interface 不会编译成真的 JS 类型，只是 TS 层面编排数据的语法"——对了一半：</strong>
+  <ol style="margin-top:8px">
+    <li>不是"选择不编译"，而是 <strong>JS 运行时根本没有"类型"可以编译过去</strong>。JS 对对象只有一个概念：<code>object</code>（一堆键值对）。interface 在 JS 世界里没有对应物，编译时只能整个丢弃。</li>
+    <li>"编排数据"要小心：<strong>interface 对数据什么都不做</strong>——不创建、不整理、不在运行时管任何事。数据是对象字面量那行运行时代码产生的，和 interface 无关。interface 真正的角色是<strong>一份只给编译器看的契约</strong>。</li>
+  </ol>
+</div>
+<div class="pre-wrap"><pre data-lang="text"><code>你写：  const msg: TextContent = { type: "text", text: "你好" };
+                │
+                ├─ 编译器：拿 interface 逐字段核对 → 通过 → 擦掉，放行
+                │         若形状不符 → 编译报错，代码根本跑不起来
+                │
+                └─ 运行时：interface 已蒸发，执行的就是那个对象字面量</code></pre></div>
+<div class="callout key">
+  <strong>推论：</strong>运行时行为只由 JS 部分决定。读 pi 源码时，所有 <code>: Type</code>、<code>&lt;T&gt;</code>、<code>interface</code>、<code>as</code>
+  都是"编译期的保安"——在脑里自动划掉它们，剩下的就是程序真正干的事。
+  而边界上的运行时数据（LLM 返回、配置文件）编译器管不到，所以 pi 用 <code>validateToolArguments()</code> 在运行时守住边界：
+  <strong>类型管内部，schema 管边界。</strong>
+</div>
+
+<h4>追问：type 和 interface 是什么关系？（Q&A 实录，精简版）</h4>
+<p><strong>两者都只是"给类型起名字"的编译期语法（运行时都蒸发），区别只在能起名字的范围：<code>interface</code> 只能描述对象形状，<code>type</code> 能给任何类型表达式起名字。</strong></p>
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON（关系一模一样）</span><pre><code># interface ≈ TypedDict：只能声明结构
+class Point(TypedDict):
+    x: int
+    y: int
+
+# type ≈ 类型别名：什么都能起名字
+Message = UserMessage | AssistantMessage
+Handler = Callable[[Event], None]
+Pair = tuple[str, int]</code></pre></div>
+  <div class="cell"><span class="lang ts">TYPESCRIPT（pi 真实例子）</span><pre><code>// 重叠区：对象形状，两者几乎等价
+interface Point { x: number; y: number }
+type Point = { x: number; y: number }
+
+// 只有 type 能干的：
+type StopReason = "stop" | "length" | "error";  // union
+type Message = UserMessage | AssistantMessage | ToolResultMessage;
+type AgentEventSink = (e: AgentEvent) =&gt; Promise&lt;void&gt; | void;  // 函数
+type Pair = [string, number];  // 元组</code></pre></div>
+</div>
+<ul>
+  <li><strong>interface 独有：</strong><code>extends</code> 继承（type 用 <code>&amp;</code> 交叉代替）、声明合并（同名 interface 自动合并字段，库作者用，认识即可）。</li>
+  <li><strong>官方建议对象优先 interface：</strong>报错信息更友好（显示 <code>Point</code> 而不是展开的形状），编译略快。</li>
+</ul>
+<table>
+  <tr><th>场景</th><th>用哪个</th></tr>
+  <tr><td>对象形状（Message、Content、Config…）</td><td><code>interface</code></td></tr>
+  <tr><td>union、字面量集合</td><td><code>type</code></td></tr>
+  <tr><td>函数签名</td><td><code>type</code></td></tr>
+  <tr><td>元组、Record/Partial 等组合</td><td><code>type</code></td></tr>
+</table>
+<div class="callout">
+  打开 <span class="file-ref">packages/ai/src/types.ts</span> 扫一眼：所有 Message/Content 是 interface，所有 <code>Xxx = A | B | C</code> 和函数类型是 type——这个分工被执行得非常整齐。
+</div>
+
+<h4>再追问：给泛型填参的结果起名，为什么只能用 type？</h4>
+<p>比如 <code>type ReadResult = ToolResultMessage&lt;{ lines: number }&gt;</code>。因为 <strong>interface 没有"等于某个已有类型"的语法</strong>——它只能从零声明一个带字段的新形状，没有 <code>=</code> 形式。<code>interface ReadResult = ToolResultMessage&lt;...&gt;</code> 是语法错误。</p>
+<div class="pre-wrap"><pre><code>// 想表达"给已有类型表达式贴个名字"（别名）→ 只能 type
+type ReadResult = ToolResultMessage&lt;{ lines: number }&gt;;   // A 就是 B
+
+// interface 的唯一近似写法是继承，但语义变了：
+interface ReadResult2 extends ToolResultMessage&lt;{ lines: number }&gt; {}
+// 读作"ReadResult2 是一种 ToolResultMessage"（声明子类型），
+// 而不是"它就是那个东西"。而且更啰嗦，union 还根本接不住：
+// type Message = UserMessage | AssistantMessage  ← interface 无任何对应写法</code></pre></div>
+<div class="callout key">
+  <strong>记忆法：interface 是"声明"，type 是"命名"。</strong>
+  interface 必须自己长出一个新形状；type 可以给任何现成的东西——union、函数、元组、填好参数的泛型——贴标签。
+</div>
+
+<h3 id="ts-s9"><div class="section-head">4 · 解构与展开 <button class="done-btn" data-section="ts-s9">标记完成</button></div></h3>
+
+<p><strong>解构 = 把数组/对象里的值"拆包"到独立变量，一步完成。</strong>数组版你在 Python 里天天用（<code>a, b = point</code>）；对象版是 TS 的重点，因为 Python 没有直接对应物。</p>
+
+<h4>① 数组解构：按位置拆 ≈ Python 元组解包</h4>
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON</span><pre><code>x, y = point
+first, *rest = items
+_, _, third = arr
+a, b = b, a          # 交换</code></pre></div>
+  <div class="cell"><span class="lang ts">TYPESCRIPT</span><pre><code>const [x, y] = point;
+const [first, ...rest] = items;
+const [, , third] = arr;   // 跳过前两个
+[a, b] = [b, a];           // 交换</code></pre></div>
+</div>
+
+<h4>② 对象解构：按字段名拆（Python 没有对应物）</h4>
+<div class="pre-wrap"><pre data-playground><code>const config = { model: "gpt-5", apiKey: "sk-x", reasoning: "high" };
+
+// 按名拆包，顺序无关（不是按位置！）
+const { model, apiKey } = config;
+console.log(model, apiKey);
+
+// 重命名：把 model 字段拆到 current 变量
+const { model: current } = config;
+console.log(current);
+
+// 字段可能不存在 → 默认值
+const { temperature = 1.0 } = config;
+console.log(temperature);   // 1.0（config 里没有这个字段）</code></pre></div>
+<div class="callout warn">
+  <strong>坑 1：</strong>对 null/undefined 解构直接抛错 <code>TypeError</code>。防御写法：<code>const { a } = maybeObj ?? {}</code>。<br>
+  <strong>坑 2：</strong>拼错字段名不报错，只是得到 <code>undefined</code>——配默认值或靠类型系统抓。
+</div>
+
+<h4>③ 函数参数解构：JS 的 kwargs（最重要的用途）</h4>
+<p>Python 有关键字参数，<strong>JS 没有</strong>——它用"传一个对象 + 参数处解构"来模拟：</p>
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON</span><pre><code>def download(url, *, retries=3, timeout=10):
+    ...
+
+download(url, timeout=30)</code></pre></div>
+  <div class="cell"><span class="lang ts">TYPESCRIPT</span><pre><code>function download(url, { retries = 3, timeout = 10 } = {}) {
+  console.log(url, retries, timeout);
+}
+
+download("a.wav", { timeout: 30 });</code></pre></div>
+</div>
+<p>pi 源码里的真实例子（agent-loop.ts）：</p>
+<div class="pre-wrap"><pre><code>await config.shouldStopAfterTurn?.({
+  message,        // ← 对象简写：{ message } 等价于 { message: message }
+  toolResults,    //    解构的逆运算：把变量按名打包成对象
+  context: currentContext,
+  newMessages,
+});
+// 调用处用简写【打包】成对象，接收方在参数里【解构】取出——传参的日常</code></pre></div>
+
+<h4>④ 其他高频用途</h4>
+<div class="pre-wrap"><pre><code>// 多返回值 ≈ Python return tuple
+function analyze(audio) { return { loudness: -14, peak: -1 }; }
+const { loudness, peak } = analyze(x);   // 调用处拆开，只取要的
+
+// 循环头（第 8 节见过）
+for (const [name, n] of Object.entries(counts)) { }  // ≈ for name, n in d.items()
+
+// 从大对象只取需要的字段：签名即文档
+function stream({ model, apiKey, signal }) { /* 只用这三个字段 */ }</code></pre></div>
+
+<h4>追问：{ ...old, key: newVal } 是"不可变更新"的标准写法，是什么意思？（Q&A 实录）</h4>
+<p>拆开这句话：<code>...</code> 是展开，整句的意思是"<strong>复制 old 的所有字段，再覆盖 key，产出一个新对象；old 本身一个字节都没动</strong>"：</p>
+<div class="pre-wrap"><pre data-playground><code>const oldConfig = { model: "gpt-5", reasoning: "high" };
+
+// 对照组·可变更新（mutate）：原地改
+const a = oldConfig;
+a.model = "claude";
+console.log("oldConfig.model 被悄悄改成:", oldConfig.model);  // "claude"！
+
+// 不可变更新：复制 + 覆盖，原对象不动
+const newConfig = { ...oldConfig, reasoning: "low" };
+console.log("oldConfig.reasoning 仍是:", oldConfig.reasoning);  // "high"
+console.log("newConfig.reasoning:", newConfig.reasoning);        // "low"
+console.log("是同一个对象吗:", newConfig === oldConfig);         // false</code></pre></div>
+<p>为什么"不原地改"值得成为一种标准写法？三个理由：</p>
+<ol>
+  <li><strong>共享引用的可预测性。</strong>多个模块持有同一个对象时，任何一处原地改，其他持有者看到的是"闹鬼"的变化。不可变更新让旧引用永远指向旧数据——≈ Python 的 <code>dataclasses.replace()</code> / <code>dict | {...}</code> 的哲学。</li>
+  <li><strong>变化检测：=== 就够了。</strong>不可变数据里"变了没"等价于"引用换了没"（<code>newConfig === oldConfig</code> 为 false 就是变了）。<strong>React 就是靠这个决定要不要重渲染的</strong>：<code>setConfig({ ...config, model })</code> 触发重渲染；原地改再 <code>setConfig(config)</code>，引用没变，React 认为无事发生——这是 React 新手最高频的 bug。你将来写 Electron UI 会天天用。</li>
+  <li><strong>历史可追溯。</strong>旧对象没被销毁，天然支持撤销/快照/事件溯源。</li>
+</ol>
+<p><strong>再追问：上面说的 setConfig 是什么？</strong>它是 React 的状态更新函数，来自 React 最核心的 API <code>useState</code>：</p>
+<div class="pre-wrap"><pre><code>// const [状态值, 状态更新函数] = useState(初始值);
+const [config, setConfig] = useState({ model: "gpt-5", reasoning: "high" });
+// ↑ 注意：这一行本身就是解构——useState 返回 [当前值, 更新函数] 二元组，数组解构拆开</code></pre></div>
+<p>React 的世界观用游戏经验类比最直观：<strong>它就是渲染循环</strong>——游戏里你不直接改像素，你改状态（血量、位置），渲染器重画；React 里你不直接改 DOM，你调 <code>setConfig(新状态)</code>，React 重渲染。<code>UI = f(state)</code>。而 React 靠<strong>引用比较</strong>判断"变了没"，所以：</p>
+<div class="pre-wrap"><pre><code>setConfig({ ...config, model: "claude" });  // 新引用 → React 重渲染 ✓
+config.model = "claude"; setConfig(config); // 同引用 → React 认为没变 → 界面不更新 ✗
+// 第二种写法数据其实变了，界面却不更新——这就是"必须不可变更新"的完整因果链</code></pre></div>
+<div class="callout key">
+  <strong>记住这个形状：</strong>在 React/Electron 里，所有状态更新都是 <code>setX({ ...old, 改动的字段 })</code>。
+  React 系统学习在第 5 课之后单开，现在记住 <code>UI = f(state)</code>、<code>setX</code> 触发重渲染、引用比较，就够了。
+</div>
+<p>pi 里的实例（agent-loop.ts 的 <code>prepareNextTurn</code>）：</p>
+<div class="pre-wrap"><pre><code>config = {
+  ...config,                                   // 保留旧配置所有字段
+  model: nextTurnSnapshot.model ?? config.model,  // 覆盖要换的
+};</code></pre></div>
+<div class="callout warn">
+  <strong>注意：展开是浅拷贝。</strong><code>{ ...old }</code> 只复制第一层，嵌套对象依然共享引用。
+  要改嵌套字段得逐层展开：<code>{ ...old, nested: { ...old.nested, x: 1 } }</code>——嵌套深了很啰嗦，这就是 Immer 这类库存在的原因（以后遇到再说）。
+</div>
+
+<h3 id="ts-s10"><div class="section-head">5 · 空值三件套：?. ?? ! <button class="done-btn" data-section="ts-s10">标记完成</button></div></h3>
+
+<p>先理解 JS 的两个"空"：<code>undefined</code>（没赋值/字段不存在，≈ Python 的"键不存在"）和 <code>null</code>（显式的空，≈ <code>None</code>）。历史包袱，实践中规则是：<strong>自己的代码用 undefined，遇到 null 当 undefined 处理</strong>。</p>
+
+<div class="pre-wrap"><pre><code>// ① 可选链 ?. —— 链上任何一环是 null/undefined，整体短路为 undefined
+config.getSteeringMessages?.()
+// ≈ Python: fn(config) if (fn := getattr(config, 'get_steering_messages', None)) else None
+
+// ② 空值合并 ?? —— 只对 null/undefined 生效
+afterResult.content ?? result.content
+// ≈ Python: after.content if after.content is not None else result.content
+
+// ③ 非空断言 ! —— 跟编译器说"我保证这不是空"，编译器放行，运行时出事自己负责
+// pi 源码里很少用，你写的时候也尽量不用</code></pre></div>
+
+<div class="callout danger">
+  <strong>?? vs ||（高频 bug）：</strong><code>a || b</code> 在 <code>a</code> 是 <code>0</code>、<code>""</code>、<code>false</code> 时也会取 b；
+  <code>a ?? b</code> 只在 <code>a</code> 是 null/undefined 时取 b。
+  Python 的 <code>or</code> 是前者的语义。处理数字（音量、时长、采样率！）时用错就是事故。pi 源码几乎只用 <code>??</code>。
+</div>
+
+<h3 id="ts-s6"><div class="section-head">6 · 函数：箭头函数与函数类型 <button class="done-btn" data-section="ts-s6">标记完成</button></div></h3>
+
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON</span><pre><code># 普通函数
+def emit(event: AgentEvent) -> None:
+    ...
+
+# lambda
+square = lambda x: x * x
+
+# 函数作为类型
+EmitFn = Callable[[AgentEvent], None]</code></pre></div>
+  <div class="cell"><span class="lang ts">TYPESCRIPT</span><pre><code>// 普通函数
+function emit(event: AgentEvent): void { ... }
+
+// 箭头函数（两种写法）
+const square = (x) =&gt; x * x;        // 单行，自动 return
+const emit = (event) =&gt; {           // 多行，需要显式 return
+  stream.push(event);
+};
+
+// 函数作为类型（agent-loop.ts 真实代码）
+export type AgentEventSink =
+  (event: AgentEvent) =&gt; Promise&lt;void&gt; | void;</code></pre></div>
+</div>
+<ul>
+  <li>箭头函数和 <code>lambda</code> 的区别：可以是多行的（用 <code>{}</code> 包起来），并且 JS 里函数是一等公民的程度比 Python 更高——源码里 90% 的"函数"都是箭头函数。</li>
+  <li>参数类型注解写在参数后面：<code>(event: AgentEvent)</code>。返回值类型写在参数列表后：<code>: void</code>。多数时候返回值类型可以省略，编译器会推断。</li>
+  <li><code>Promise&lt;void&gt; | void</code> 读作"返回 Promise 或直接不返回都行"——调用方都会 <code>await</code>，两种都能正常工作（<code>await</code> 一个非 Promise 值是合法的）。</li>
+</ul>
+
+<h4>追问：什么叫"一等公民"？（Q&A 实录，精简版）</h4>
+<p>说一个东西是语言的一等公民，指它享有完整的"值"的权利：① 赋值给变量 ② 作为参数传递 ③ 作为返回值 ④ 存进数据结构 ⑤ 运行时匿名创建。函数在 TS 里五项全有：</p>
+<div class="pre-wrap"><pre><code>const f = (x) =&gt; x * 2;                          // ① 赋值给变量
+arr.map((x) =&gt; x * 2);                           // ② 作为参数传递
+function makeAdder(n) { return (x) =&gt; x + n; }   // ③ 作为返回值
+const handlers = { click: () =&gt; save() };        // ④ 存进数据结构
+setTimeout(() =&gt; { save(); }, 100);              // ⑤ 匿名创建，随用随造</code></pre></div>
+<p><strong>那 Python 函数不也是一等公民吗？</strong>是，权利清单打平。差异在密度：Python 的 <code>lambda</code> 只能是单行表达式，多行逻辑被迫 <code>def</code> 起名；JS 的箭头函数可以多行，匿名逻辑随用随造：</p>
+<div class="pre-wrap"><pre><code>// JS：多行匿名函数就地创造，永远不用被迫起名
+const hasSeq = calls.some((tc) =&gt; {
+  const tool = tools.find((t) =&gt; t.name === tc.name);
+  return tool?.executionMode === "sequential";
+});</code></pre></div>
+<div class="callout key">
+  <strong>结论：</strong>JS 让匿名函数拥有完整表达力（多行体），于是"把行为当值传来传去"从技巧变成了这门语言的默认编程方式——
+  数组方法、事件、异步、React 渲染全是回调。pi 源码"每三行一个小函数"的观感，就是这个设计哲学的直接后果。
+</div>
+
+<h3 id="ts-s5"><div class="section-head">7 · 数组的函数式方法 <button class="done-btn" data-section="ts-s5">标记完成</button></div></h3>
+
+<p>Python 的列表推导式，在 TS 里是方法链：</p>
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON</span><pre><code># 找出所有 toolCall，取出 name
+names = [c.name for c in content
+         if c.type == "toolCall"]
+
+# 有没有名为 edit 的工具？
+has_edit = any(t.name == "edit" for t in tools)
+
+# 按名字找工具
+tool = next((t for t in tools
+             if t.name == call.name), None)</code></pre></div>
+  <div class="cell"><span class="lang ts">TYPESCRIPT</span><pre><code>// filter + map（agent-loop.ts 真实代码）
+const names = content
+  .filter((c) =&gt; c.type === "toolCall")
+  .map((c) =&gt; c.name);
+
+// some
+const hasEdit = tools.some((t) =&gt; t.name === "edit");
+
+// find（找不到返回 undefined，不是抛异常）
+const tool = tools.find((t) =&gt; t.name === call.name);</code></pre></div>
+</div>
+<ul>
+  <li>对照表：<code>filter</code> ≈ 推导式的 if 部分，<code>map</code> ≈ 表达式部分，<code>some</code> ≈ <code>any()</code>，<code>every</code> ≈ <code>all()</code>，<code>find</code> ≈ <code>next(..., None)</code>，<code>forEach</code> ≈ for 循环。</li>
+  <li><code>(c) =&gt; c.type === "toolCall"</code> 是箭头函数，上一节刚学。</li>
+</ul>
+
+<h4>追问：some / every / find 详解（Q&A 实录）</h4>
+<p>这三个都是<strong>数组实例方法</strong>，接收一个回调（predicate），并且都<strong>短路</strong>——和 Python 的 <code>any()</code> / <code>all()</code> / <code>next(..., None)</code> 一样，一旦结果确定就立即停止遍历。</p>
+
+<p><strong>some ↔ any()：只要有一个元素让回调返回 true，整体就是 true。</strong></p>
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON</span><pre><code># any 直接对元素判"真值"
+has_edit = any(t.name == "edit" for t in tools)</code></pre></div>
+  <div class="cell"><span class="lang ts">TYPESCRIPT（agent-loop.ts 真实代码）</span><pre><code>const hasSequentialToolCall = toolCalls.some(
+  (tc) =&gt; tools.find((t) =&gt; t.name === tc.name)?.executionMode === "sequential"
+);</code></pre></div>
+</div>
+<ul>
+  <li><strong>Python 的 <code>any()</code> 可以不带条件</strong>：<code>any([0, "", 3])</code> → <code>True</code>，直接对元素本身判真值。</li>
+  <li><strong>JS 的 <code>some</code> 必须传回调</strong>，没有"裸"版本。想要真值判断得写 <code>arr.some((x) =&gt; x)</code> 或 <code>arr.some(Boolean)</code>。</li>
+  <li>空数组：<code>[].some(f)</code> → <code>false</code>；<code>any([])</code> → <code>False</code>。一致。</li>
+</ul>
+
+<p><strong>every ↔ all()：所有元素都让回调返回 true，整体才是 true。</strong></p>
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON</span><pre><code>def should_terminate(calls):
+    return len(calls) &gt; 0 and all(
+        c.result.terminate for c in calls)</code></pre></div>
+  <div class="cell"><span class="lang ts">TYPESCRIPT（agent-loop.ts 真实代码）</span><pre><code>// 所有工具结果都要求 terminate，才终止整个 agent
+function shouldTerminateToolBatch(finalizedCalls) {
+  return finalizedCalls.length &gt; 0 &amp;&amp; finalizedCalls.every(
+    (finalized) =&gt; finalized.result.terminate === true
+  );
+}</code></pre></div>
+</div>
+<div class="callout warn">
+  <strong>空数组的坑（两边一致但都值得记住）：</strong><code>[].every(f)</code> → <strong><code>true</code></strong>，<code>all([])</code> → <strong><code>True</code></strong>（空真 / vacuous truth）。
+  所以 pi 的代码显式加了 <code>length &gt; 0</code> 前置条件——故意防御"一批零个工具结果时意外终止"。
+</div>
+
+<p><strong>find ↔ next(..., None)：返回第一个让回调返回 true 的元素本身。</strong></p>
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON</span><pre><code>tool = next((t for t in tools
+             if t.name == call.name), None)
+if tool is None:
+    ...</code></pre></div>
+  <div class="cell"><span class="lang ts">TYPESCRIPT（agent-loop.ts 真实代码）</span><pre><code>const tool = currentContext.tools?.find(
+  (t) =&gt; t.name === toolCall.name
+);
+if (!tool) {
+  return { kind: "immediate",
+    result: createErrorToolResult(\`Tool ... not found\`) };
+}</code></pre></div>
+</div>
+<ul>
+  <li><strong>Python 的 <code>next(..., None)</code> 找不到时返回你指定的默认值</strong>；<strong>JS 的 <code>find</code> 找不到时固定返回 <code>undefined</code></strong>，不能自定义。想要默认值得自己接：<code>find(...) ?? defaultTool</code>。</li>
+  <li>"拿元素"和"是否存在"别混用：<code>find</code> 拿元素，<code>some</code> 拿布尔。常见错误是两个各写一遍扫两次——需要元素就一次 <code>find</code> 然后判 <code>undefined</code>。</li>
+</ul>
+
+<p><strong>速查表：</strong></p>
+<table>
+  <tr><th>需求</th><th>Python</th><th>TypeScript</th><th>找不到/空数组时</th></tr>
+  <tr><td>存在吗</td><td><code>any(p(x) for x in xs)</code></td><td><code>xs.some((x) =&gt; p(x))</code></td><td>空 → <code>false</code></td></tr>
+  <tr><td>全都满足吗</td><td><code>all(p(x) for x in xs)</code></td><td><code>xs.every((x) =&gt; p(x))</code></td><td>空 → <strong><code>true</code></strong>（坑）</td></tr>
+  <tr><td>拿第一个满足的元素</td><td><code>next((x for x in xs if p(x)), None)</code></td><td><code>xs.find((x) =&gt; p(x))</code></td><td>→ <code>undefined</code></td></tr>
+  <tr><td>索引也要</td><td><code>next(i for i,x in enumerate(xs) if p(x))</code></td><td><code>xs.findIndex((x) =&gt; p(x))</code></td><td>→ <code>-1</code>（不是 undefined！）</td></tr>
+  <tr><td>真值判断（不带条件）</td><td><code>any(xs)</code> / <code>all(xs)</code></td><td><code>xs.some(Boolean)</code> / <code>xs.every(Boolean)</code></td><td>同上</td></tr>
+</table>
+
+<p><strong>两个组合实例（都来自 pi）：</strong></p>
+<div class="pre-wrap"><pre><code>// ① some 里嵌 find —— "有没有一个 toolCall，它对应的工具要求串行执行"
+toolCalls.some((tc) =&gt;
+  tools.find((t) =&gt; t.name === tc.name)?.executionMode === "sequential")
+// 注意 ?.：find 没找到时返回 undefined，?.executionMode 安全短路成 undefined，
+// undefined === "sequential" 是 false，不会炸。这是 find + 可选链的标准搭档。
+
+// ② every 决定终止 —— "全部工具都说停才停"
+// 语义比手写 for 循环准确，且短路特性保证第一个 terminate: false 就结束判断</code></pre></div>
+
+<p><strong>亲手试一下</strong>（自带数据，点右上角"▶ 试一试"直接运行，然后改改数据观察输出）：</p>
+<div class="pre-wrap"><pre data-playground><code>const tools = [
+  { name: "read", executionMode: "parallel" },
+  { name: "edit", executionMode: "sequential" },
+  { name: "bash", executionMode: "parallel" },
+];
+const toolCalls = [{ name: "read" }, { name: "edit" }];
+
+// some 里嵌 find：有没有一个 toolCall 对应串行工具？
+const hasSeq = toolCalls.some((tc) =&gt;
+  tools.find((t) =&gt; t.name === tc.name)?.executionMode === "sequential");
+console.log("有串行工具吗:", hasSeq);
+
+// every + some 组合：所有 toolCall 都有对应工具吗？
+const allKnown = toolCalls.every((tc) =&gt;
+  tools.some((t) =&gt; t.name === tc.name));
+console.log("全部认识吗:", allKnown);
+
+// find 找不到时返回 undefined，用 ?? 接默认值
+console.log("找到:", tools.find((t) =&gt; t.name === "edit"));
+console.log("找不到:", tools.find((t) =&gt; t.name === "xxx") ?? "没有此工具");
+
+// 实验：把 toolCalls 里的 "edit" 改成 "xxx"，重新运行，观察三行输出怎么变</code></pre></div>
+
+<h3 id="ts-s5b"><div class="section-head">8 · 循环：for...of 与遍历 <button class="done-btn" data-section="ts-s5b">标记完成</button></div></h3>
+
+<h4>for...of ≈ Python 的 for...in</h4>
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON</span><pre><code>for name in names:
+    print(name)
+
+for i, name in enumerate(names):
+    print(i, name)</code></pre></div>
+  <div class="cell"><span class="lang ts">TYPESCRIPT</span><pre><code>for (const name of names) {
+  console.log(name);
+}
+
+for (const [i, name] of names.entries()) {
+  console.log(i, name);
+}</code></pre></div>
+</div>
+<div class="callout warn">
+  <strong>JS 最大的循环陷阱：<code>for...in</code> 不是 Python 的 for...in！</strong>
+  JS 的 <code>for...in</code> 遍历的是<strong>键（字符串索引）</strong>，不是值：<code>for (const i in ["a","b"])</code> 得到 <code>"0", "1"</code>。
+  规则：<strong>遍历值永远用 <code>for...of</code>；<code>for...in</code> 基本不用</strong>（遍历对象键请用 <code>Object.keys/entries</code>）。
+</div>
+
+<h4>遍历字典 / Map</h4>
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON</span><pre><code>for name, n in counts.items():
+    print(name, n)</code></pre></div>
+  <div class="cell"><span class="lang ts">TYPESCRIPT</span><pre><code>// 普通对象：Object.entries ≈ .items()
+for (const [name, n] of Object.entries(counts)) {
+  console.log(name, n);
+}
+// Map 本身直接可迭代（比对象顺手）
+for (const [name, n] of map) { ... }</code></pre></div>
+</div>
+<p><code>while</code>、C 风格 <code>for (let i = 0; i &lt; n; i++)</code>、<code>break</code>/<code>continue</code> 和 Python 一样，不展开。</p>
+
+<h4>什么时候用循环，什么时候用 map/filter</h4>
+<p>经验法则：<strong>要新数组（数据转换）用 map/filter；做事（副作用：日志、写文件、逐个 await）用 for...of</strong>。
+循环里涉及 <code>await</code> 的调度问题（串行 vs 并行，差异巨大）放到第 2 课（异步编程）实测——需要先建立 Promise 的认知。</p>
+
+<h4>for...of 底下的机制：迭代器协议 ≈ Python 的 __iter__/__next__</h4>
+<div class="pre-wrap"><pre data-playground><code>const it = ["a", "b"][Symbol.iterator]();   // ≈ it = iter(arr)
+console.log(it.next());  // { value: "a", done: false }        ≈ next(it)
+console.log(it.next());  // { value: "b", done: false }
+console.log(it.next());  // { value: undefined, done: true }   ≈ StopIteration</code></pre></div>
+<p>任何实现了 <code>[Symbol.iterator]()</code> 的对象都能被 <code>for...of</code> 和 <code>[...展开]</code> 消费——数组、Set、Map、字符串。生成器（第 2 课会讲）也实现了它，所以生成器可以直接被遍历。</p>
+
+<h3 id="ts-s3"><div class="section-head">9 · Union 与判别联合（全仓库最重要的模式）<button class="done-btn" data-section="ts-s3">标记完成</button></div></h3>
+
+<p>先看两个真实定义（<span class="file-ref">packages/ai/src/types.ts</span>）：</p>
+<div class="pre-wrap"><pre><code>// 字面量 union：取值只能是这几个字符串之一
+export type StopReason = "pending" | "stop" | "length" | "toolUse" | "error" | "aborted";
+// ≈ Python: StopReason = Literal["pending", "stop", "length", ...]</code></pre></div>
+
+<p>然后是重头戏——<strong>判别联合（discriminated union）</strong>。assistant 消息的 content 是三种内容块的 union，每块都有一个 <code>type</code> 字面量字段当"标签"：</p>
+<div class="pre-wrap"><pre><code>export interface TextContent {
+  type: "text";          // ← 标签
+  text: string;
+  textSignature?: string;
+}
+
+export interface ThinkingContent {
+  type: "thinking";      // ← 标签
+  thinking: string;
+  redacted?: boolean;
+}
+
+export interface ToolCall {
+  type: "toolCall";      // ← 标签
+  id: string;
+  name: string;
+  arguments: Record&lt;string, any&gt;;
+}
+
+// AssistantMessage.content 的类型：
+(TextContent | ThinkingContent | ToolCall)[]</code></pre></div>
+
+<p>对照 Python，你大概会这样写：</p>
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON</span><pre><code>@dataclass
+class TextContent:
+    type: Literal["text"]
+    text: str
+
+@dataclass
+class ToolCall:
+    type: Literal["toolCall"]
+    id: str
+    name: str
+    arguments: dict[str, Any]
+
+Content = Union[TextContent, ThinkingContent, ToolCall]</code></pre></div>
+  <div class="cell"><span class="lang ts">说明</span><pre><code>// 完全同构。区别只在：
+// 1. TS 用对象字面量直接构造，不用 new
+// 2. TS 里这是"形状"，运行时不存在类
+//
+// 构造一个 TextContent：
+const c: TextContent = { type: "text", text: "hi" };</code></pre></div>
+</div>
+
+<h3 id="ts-s4"><div class="section-head">10 · 类型收窄（narrowing）：联合类型的打开方式 <button class="done-btn" data-section="ts-s4">标记完成</button></div></h3>
+
+<p>有了判别联合，怎么"解包"？检查标签字段，TS 会<strong>自动收窄</strong>类型。这是 <span class="file-ref">agent-loop.ts</span> 里的真实代码：</p>
+<div class="pre-wrap"><pre><code>const toolCalls = message.content.filter((c) =&gt; c.type === "toolCall");
+//                                         ↑ 只看这个判断
+// 在 === "toolCall" 为真的分支里，c 自动从 union 收窄成 ToolCall，
+// 可以安全访问 c.name、c.arguments，编译器保证字段存在</code></pre></div>
+
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON (3.10+ match)</span><pre><code>match event:
+    case {"type": "text"}:
+        print(event["text"])
+    case {"type": "toolCall"}:
+        run_tool(event["name"])</code></pre></div>
+  <div class="cell"><span class="lang ts">TYPESCRIPT (switch)</span><pre><code>switch (event.type) {
+  case "text":
+    console.log(event.text);  // 收窄为 TextContent
+    break;
+  case "toolCall":
+    runTool(event.name);      // 收窄为 ToolCall
+    break;
+}</code></pre></div>
+</div>
+
+<p>你在 <code>streamAssistantResponse</code> 里看到的大 <code>switch (event.type)</code> 就是在做模式匹配。TS 还有检查<strong>穷尽性</strong>的能力：如果 union 加了新成员而 switch 没处理，可以让编译器报错——比 Python 的运行时才发现强得多。</p>
+
+<div class="callout key">
+  <strong>记住这个组合：</strong>字面量类型 + union + switch 收窄 = TS 领域建模的三件套。
+  pi 里所有核心概念（Message、Content、Event、StopReason）都是这么建模的。你将来设计音频 agent 的
+  领域模型（AssetContent | AnalysisResult | RenderJob…）也应该用同一套。
+</div>
+
+<h3 id="ts-s7"><div class="section-head">11 · 泛型 <button class="done-btn" data-section="ts-s7">标记完成</button></div></h3>
+
+<p>和 Python 的 <code>Generic[T]</code> 概念相同，写法不同：</p>
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON</span><pre><code>T = TypeVar("T")
+
+class EventStream(Generic[T, R]):
+    ...
+
+def first(items: list[T]) -> T | None:
+    return items[0] if items else None</code></pre></div>
+  <div class="cell"><span class="lang ts">TYPESCRIPT</span><pre><code>// 真实代码：types.ts
+interface ToolResultMessage&lt;TDetails = any&gt; {
+  role: "toolResult";
+  toolCallId: string;
+  details?: TDetails;   // 每个工具自己的详情类型
+  ...
+}
+
+// 带默认值的泛型参数：不写就是 any
+type R1 = ToolResultMessage;             // details: any
+type R2 = ToolResultMessage&lt;{bytes: number}&gt;;</code></pre></div>
+</div>
+<p>再比如 agent loop 的返回值类型：</p>
+<div class="pre-wrap"><pre><code>EventStream&lt;AgentEvent, AgentMessage[]&gt;
+//          ↑ 流里每个事件的类型   ↑ 流结束后最终 resolve 出的值类型</code></pre></div>
+
+<p>还有几个常见的"类型工具"（≈ Python 的 <code>typing</code> 模块里的东西），见到认识即可：</p>
+<table>
+  <tr><th>TS</th><th>含义</th><th>Python 类比</th></tr>
+  <tr><td><code>Record&lt;string, any&gt;</code></td><td>键为 string 的 dict</td><td><code>dict[str, Any]</code></td></tr>
+  <tr><td><code>Partial&lt;T&gt;</code></td><td>T 的所有字段变可选</td><td>没有直接对应（≈ 所有字段默认 None 的 dataclass）</td></tr>
+  <tr><td><code>unknown</code></td><td>什么都能装，但用之前必须收窄</td><td><code>Any</code> 的"安全版"（<code>object</code>）</td></tr>
+  <tr><td><code>any</code></td><td>关掉类型检查</td><td><code>Any</code>（pi 仓库规则：能不用就不用）</td></tr>
+</table>
+
+<h4>追问：泛型到底是什么？（Q&A 实录，精简版）</h4>
+<p><strong>一句话：泛型 = 给类型系统写的函数。</strong>普通函数接收值、返回值；泛型接收类型、算出类型。运行时照例全部蒸发。</p>
+<p>它解决的问题——写一个"返回数组第一个元素"的函数，不用泛型只有两条烂路：</p>
+<div class="pre-wrap"><pre data-playground><code>// 路 2：用 any → 类型信息全丢
+function firstBad(items: any[]): any {
+  return items[0];
+}
+const x = firstBad(["a", "b"]);
+// x 是 any：x.toFixed(2) 编译都能过，运行时爆炸
+
+// 泛型：输入什么数组，就返回什么元素——类型被精确追踪
+function first&lt;T&gt;(items: T[]): T | undefined {
+  return items[0];
+}
+const a = first(["a", "b"]);  // a: string（T 被推断为 string）
+const b = first([1, 2, 3]);   // b: number
+console.log(a, b, first([])); // 空数组 → undefined</code></pre></div>
+<div class="pair">
+  <div class="cell"><span class="lang py">PYTHON（你其实见过）</span><pre><code>T = TypeVar("T")
+
+def first(items: list[T]) -&gt; T | None:
+    return items[0] if items else None
+
+# 完全同构：TypeVar ↔ &lt;T&gt;</code></pre></div>
+  <div class="cell"><span class="lang ts">说明</span><pre><code>// 区别只有两个：
+// 1. TS 泛型参数写在函数名后面 &lt;T&gt;
+// 2. TS 推断更积极：
+//    调用处几乎永远不用手写 &lt;string&gt;，
+//    编译器从实参自动算出来</code></pre></div>
+</div>
+
+<p><strong>最常见的用法：给"形状"留一个插槽（pi 真实代码）</strong></p>
+<div class="pre-wrap"><pre><code>// types.ts：每种工具的 details 类型不同，公共骨架只写一次
+interface ToolResultMessage&lt;TDetails = any&gt; {
+  role: "toolResult";
+  toolCallId: string;
+  details?: TDetails;   // ← 插槽
+  isError: boolean;
+}
+type ReadResult = ToolResultMessage&lt;{ lines: number }&gt;;
+type AnyResult  = ToolResultMessage;  // 不写参数 → 用默认值 any</code></pre></div>
+<p>用你的音频领域类比：</p>
+<div class="pre-wrap"><pre><code>interface AnalysisResult&lt;TMetrics&gt; {
+  assetName: string;
+  durationSec: number;
+  metrics: TMetrics;  // 响度分析、频谱分析的指标结构不同
+}
+type LoudnessReport = AnalysisResult&lt;{ integrated: number; truePeak: number }&gt;;
+type SpectrumReport = AnalysisResult&lt;{ bands: number[]; centroid: number }&gt;;</code></pre></div>
+<ul>
+  <li><strong>多个参数</strong>：<code>EventStream&lt;AgentEvent, AgentMessage[]&gt;</code> ≈ <code>Generic[E, R]</code>——"吐出什么事件、最终 resolve 什么值"。</li>
+  <li><strong>约束 extends</strong>：<code>&lt;T extends { name: string }&gt;</code> ≈ bounded TypeVar——"不是什么类型都能装进这个插槽"。</li>
+  <li><strong>推断</strong>：<code>["a"].map((x) =&gt; x.toUpperCase())</code> 里 T、U 全是编译器算的。<strong>泛型主要在定义处写，使用处靠推断。</strong></li>
+</ul>
+<div class="callout key">
+  <strong>认知闭环：</strong><code>any</code> 是"放弃追踪"，泛型是"精确追踪类型的流动"——这就是本仓库禁用 any 的原因。
+  <strong>和判别联合的分工：</strong>能枚举所有变体 → 用 union（Message 三种）；形状无限但有公共骨架 → 留泛型插槽（任意工具的 details）。
+  设计自己的领域模型时先问："我能枚举所有变体吗？"
+</div>
+
+<h3 id="ts-s11"><div class="section-head">12 · 类型的真相：编译期存在，运行时消失 <button class="done-btn" data-section="ts-s11">标记完成</button></div></h3>
+
+<p>第 3 节已经证明了核心事实：<strong>类型在编译后全部蒸发，运行时一行不剩</strong>。类型部分收尾前，本节回答它留下的两个工程问题：</p>
+<ol>
+  <li>编译期和运行时的"<strong>接缝</strong>"在哪里？（哪里是类型系统管不到的地方）</li>
+  <li>接缝处怎么守住？（TS 给你什么工具，又哪里必须靠运行时代码）</li>
+</ol>
+
+<h4>① 接缝：外部数据进入系统的那一刻</h4>
+<p>内部代码的类型由编译器保证；但有些东西<strong>运行时才进入系统</strong>，编译器对它们零了解：</p>
+<div class="pre-wrap"><pre><code>const data = JSON.parse(text);   // 类型是 any：网络响应、配置文件，编译器完全不查
+// LLM 返回的 tool call 参数、用户写的扩展配置——同理</code></pre></div>
+<p>这些地方就是接缝。接缝两边的世界观：<strong>内部 = 类型保证；边界 = 类型只是你的愿望</strong>。</p>
+
+<h4>② as 与 satisfies：和编译器对话的两个工具</h4>
+<p>面对接缝数据，TS 提供两个编译期工具，方向正好相反：</p>
+<div class="pre-wrap"><pre><code>// as（类型断言）：你跟编译器说"相信我，就是这个类型"
+// ≈ Python: typing.cast(...)。不做任何运行时检查，说错了运行时自己承担
+prepared.args as never   // agent-loop.ts 真实代码
+
+// satisfies：你跟编译器说"帮我检查它符合类型，但别改变你推断出的精确类型"
+const finalized = { toolCall, result, isError } satisfies FinalizedToolCallOutcome;
+// 如果字段写错，编译报错；但 finalized 的类型仍按字面量精确推断，不被拉宽</code></pre></div>
+<div class="callout warn">
+  <strong><code>as</code> 是最容易被滥用的语法：</strong>它能通过编译不等于数据真的是那个形状——你只是关闭了检查。
+  本仓库规则"能不用 any 就不用"同样适用于 <code>as</code>；确需使用时，要么紧邻运行时校验之后，要么加注释说明为什么安全。
+</div>
+
+<h4>③ 接缝处真正的防线：运行时校验</h4>
+<p><code>as</code> 只是你打包票，并不能让数据变成真的。所以边界上必须有<strong>运行时代码</strong>真正检查数据：</p>
+<div class="pre-wrap"><pre><code>// pi 的做法：LLM 给的 tool call 参数，先过 schema 校验再执行
+const validatedArgs = validateToolArguments(tool, preparedToolCall);
+// 校验失败 → 转成错误 toolResult 喂回模型（第 3 课的自愈机制）</code></pre></div>
+<div class="callout key">
+  <strong>类型管内部，schema 管边界。</strong>这就是 Python 世界 pydantic 干的事；TS 里常用 zod 或手写校验函数。
+  设计你的音频 agent 时同理：LLM 输出的参数、用户上传的 preset 文件，进系统先过校验，然后内部代码才能放心靠类型。
+</div>
+
+<h4>④ 另一个运行时真相：catch 到的 error 没有类型</h4>
+<p>JS 允许 <code>throw</code> 任意值（字符串、数字都行），所以 <code>catch</code> 到的 error 编译器无法给出类型——这又是运行时现实，处理方式是第 10 节的收窄机制：</p>
+<div class="pre-wrap"><pre><code>// agent-loop.ts 真实代码（标准防御写法）
+} catch (error) {
+  return {
+    // instanceof 在运行时把 error 收窄成 Error，才能安全访问 .message
+    result: createErrorToolResult(error instanceof Error ? error.message : String(error)),
+    isError: true,
+  };
+}
+// ≈ Python: except Exception as e: ... str(e)</code></pre></div>
+<p>这节和第 3 节合起来就是完整图景：<strong>编译期，类型让内部代码自洽；运行时，收窄和校验守住边界。</strong></p>
+
+<h3 id="ts-s12"><div class="section-head">13 · 小测验（自测）<button class="done-btn" data-section="ts-s12">标记完成</button></div></h3>
+
+<div class="homework">
+  <h4>不看答案，口头/心里回答，然后对照源码验证</h4>
+  <label class="hw-check"><input type="checkbox" data-hw="ts-q1">
+    <span>① <code>packages/ai/src/types.ts</code> 里 <code>ThinkingLevelMap = Partial&lt;Record&lt;ModelThinkingLevel, string | null&gt;&gt;</code> 怎么读？（提示：一个 dict，键是 thinking 等级，值可选，每个键本身也可缺）</span></label>
+  <label class="hw-check"><input type="checkbox" data-hw="ts-q2">
+    <span>② <code>agent-loop.ts</code> 里 <code>const toolCalls = message.content.filter((c) =&gt; c.type === "toolCall");</code> —— 用 Python 写出等价的一行。</span></label>
+  <label class="hw-check"><input type="checkbox" data-hw="ts-q3">
+    <span>③ 为什么 <code>AgentEventSink</code> 的返回类型是 <code>Promise&lt;void&gt; | void</code> 而不是 <code>Promise&lt;void&gt;</code>？</span></label>
+  <label class="hw-check"><input type="checkbox" data-hw="ts-q4">
+    <span>④ <code>const next = { ...config, model: "gpt-5" };</code> 之后，<code>config</code> 变了吗？<code>next.tools === config.tools</code> 是 true 吗？</span></label>
+  <label class="hw-check"><input type="checkbox" data-hw="ts-q5">
+    <span>⑤ 在 <span class="file-ref">packages/ai/src/types.ts</span> 找到 <code>Usage</code> interface，说出 <code>cacheWrite1h?: number</code> 和 <code>reasoning?: number</code> 的 <code>?</code> 含义，以及为什么 LLM 返回的数据不能只靠这个 interface 保证正确。</span></label>
+</div>
+
+<div class="callout">
+  <strong>完成后：</strong>你已经具备阅读 pi 全部源码的 TS 词汇。剩下不认识的语法，遇到直接问，比提前学快得多。
+  下一课学异步编程（event loop、Promise、for await），打牢读 pi 流式源码的地基。
+</div>
+
+<h3 id="ts-s17"><div class="section-head">14 · 扩展阅读 <button class="done-btn" data-section="ts-s17">标记完成</button></div></h3>
+
+<p>按与本课的相关度排序。遇到具体语法疑问优先查前两个：</p>
+
+<h4>TypeScript</h4>
+<ul>
+  <li><a href="https://ts.xcatliu.com/introduction/index.html" target="_blank" rel="noopener">TypeScript 入门教程（xcatliu）↗</a> —— 中文，语法覆盖全且例子密集，适合当本课的案头参考书</li>
+  <li><a href="https://www.typescriptlang.org/docs/handbook/intro.html" target="_blank" rel="noopener">TypeScript 官方 Handbook ↗</a> —— 权威定义，查语义细节（如 narrowing、declaration merging）的第一出处</li>
+  <li><a href="https://basarat.gitbook.io/typescript/" target="_blank" rel="noopener">TypeScript Deep Dive（basarat）↗</a> —— 进阶，坑和最佳实践讲得多，英文</li>
+</ul>
+
+<h4>异步与并发</h4>
+<ul>
+  <li><a href="https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Execution_model" target="_blank" rel="noopener">MDN：JavaScript 并发模型与事件循环 ↗</a> —— 第 2 课事件循环的官方展开版</li>
+  <li><a href="https://go.dev/talks/2012/waza.slide" target="_blank" rel="noopener">Rob Pike: Concurrency Is Not Parallelism ↗</a> —— 第 2 课引用的那场经典演讲的幻灯片</li>
+  <li><a href="https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Promise" target="_blank" rel="noopener">MDN：Promise ↗</a> —— 第 14 节所有组合器的完整语义和边界行为</li>
+</ul>
+
+<h4>本课的"活教材"</h4>
+<ul>
+  <li><a href="https://nodejs.org/api/typescript.html" target="_blank" rel="noopener">Node.js 官方：TypeScript 类型擦除模式 ↗</a> —— pi 仓库"只用可擦除语法"规则的出处</li>
+  <li><span class="file-ref">packages/ai/src/types.ts</span> —— 最好的语法复习材料：interface、union、泛型、Record/Partial 的真实生产用法</li>
+</ul>
+    `,
+  },
+
+  // ============================================================
+  // 第 2 课：异步编程
+  // ============================================================
+  {
+    id: "lesson-async",
+    title: "第 2 课 · 异步编程",
+    sub: "从零开始 · event loop · Promise · await · for await",
+    html: `
+<div class="lesson-header">
+  <div class="lesson-tag">LESSON 02</div>
+  <h2>异步编程从零：event loop、Promise 与流式消费</h2>
+  <div class="meta">前置：第 1 课 TypeScript 速成 · 零异步经验可学 · 每个代码块都能点"试一试"当场运行</div>
+</div>
+
+<h3 id="ts-a1"><div class="section-head">1 · 从零起步：同步、回调与第一个 async 函数 <button class="done-btn" data-section="ts-a1">标记完成</button></div></h3>
+
+<h4>① 先理解问题：等待的时间纯属浪费</h4>
+<p>用你的领域举例：批量分析 100 个素材的响度，每个要从对象存储下载，网络等待 1 秒。如果代码"下载1 → 等 1 秒 → 分析1 → 下载2 → ……"这样写，100 个素材就干等 100 秒——CPU 在等网络的时间里什么都没干。异步编程要解决的问题就是：<strong>等待别人的时候，自己别闲着。</strong></p>
+
+<h4>② 同步代码的世界：一行接一行，等就硬等</h4>
+<p>你目前写的所有代码都是同步的：一行跑完跑下一行，想"等 1 秒"只能硬耗：</p>
+<div class="pre-wrap"><pre data-playground><code>function busyWait(ms) {
+  const end = Date.now() + ms;
+  while (Date.now() &lt; end) { /* 空转，把 CPU 占死 */ }
+}
+
+console.log("开始等");
+busyWait(1000);
+console.log("等完了——但这 1 秒里程序什么都干不了");</code></pre></div>
+<p>这种"硬等"在浏览器里意味着页面冻结，在服务器里意味着浪费一个线程。<strong>同步代码的等待 = 占着线程什么都不干。</strong></p>
+
+<h4>③ setTimeout：你的第一个异步 API——"登记未来，继续赶路"</h4>
+<div class="pre-wrap"><pre data-playground><code>console.log("A：我先跑");
+setTimeout(() =&gt; {
+  console.log("B：1 秒后我才被调用");
+}, 1000);
+console.log("C：我不等 B，直接跑");
+
+// 输出顺序：A → C →（1 秒后）B
+// 初学者第一个反直觉时刻：C 排在 B 前面！</code></pre></div>
+<p>逐句拆开看 <code>setTimeout</code> 干了什么：</p>
+<ol>
+  <li>它<strong>不等待</strong>。它把"1 秒后要做的那个函数"（术语叫<strong>回调 callback</strong>）登记给系统，<strong>立刻返回</strong>。</li>
+  <li>你的代码继续往下跑（打印 C）。</li>
+  <li>1 秒后，系统回头调用你登记的那个函数（打印 B）。</li>
+</ol>
+<div class="callout key">
+  <strong>"登记 → 继续 → 回头执行"是全部异步编程的基本动作。</strong>后面学的 Promise、await 都是把这个动作包装得更好写，但底下都是它。
+</div>
+
+<h4>④ 回调风格的问题：嵌套地狱</h4>
+<p>一件事用回调还行，几件有顺序的事就开始难看：</p>
+<div class="pre-wrap"><pre><code>setTimeout(() =&gt; {
+  console.log("下载完成");
+  setTimeout(() =&gt; {
+    console.log("分析完成");
+    setTimeout(() =&gt; {
+      console.log("入库完成");
+    }, 300);
+  }, 300);
+}, 300);
+// 才三步就向右倾斜了；十步、再加上每步的错误处理，就没法维护了</code></pre></div>
+<p>这就是著名的"回调地狱"。我们需要一种写法：<strong>既能享受异步的不等待，读起来又像同步代码一样从上往下。</strong>这就是 async/await。</p>
+
+<h4>⑤ 第一个 async 函数：逐行读</h4>
+<div class="pre-wrap"><pre data-playground><code>// sleep(ms) 返回一个"ms 毫秒后会完成"的 Promise 对象（下一节讲透它）
+const sleep = (ms) =&gt; new Promise((r) =&gt; setTimeout(r, ms));
+
+async function main() {      // async 关键字：① 这个函数里允许用 await
+                             //               ② 这个函数的返回值自动变成 Promise
+  console.log("开始");
+  await sleep(1000);         // await 关键字：在这里【暂停】，等 Promise 完成，
+                             // 然后从这行的下一行继续
+  console.log("1 秒过去了");
+  await sleep(500);
+  console.log("又过了 0.5 秒");
+}
+
+main();  // 调用 async 函数：立即开始跑，直到第一个 await</code></pre></div>
+<p>逐条记住：</p>
+<ul>
+  <li><code>await</code> <strong>只能写在 async 函数里</strong>（本 Playground 的顶层是例外，它被包在一个 async 函数里）。</li>
+  <li>多个 <code>await</code> <strong>顺序执行</strong>：第一个 sleep 没完，第二个不会开始。读起来和同步代码一模一样。</li>
+  <li>但和同步硬等不同：<strong>暂停期间线程没有被占住</strong>——它被借去干别的活了（第 3 节你会看到这个的证据）。</li>
+</ul>
+
+<h4>⑥ 出错怎么办：try/catch，和同步代码一样</h4>
+<div class="pre-wrap"><pre data-playground><code>const sleep = (ms) =&gt; new Promise((r) =&gt; setTimeout(r, ms));
+
+async function mightFail() {
+  await sleep(200);
+  throw new Error("网络断了");   // async 函数里 throw → 等它的人能在 catch 里接到
+}
+
+try {
+  await mightFail();
+  console.log("这行不会执行");
+} catch (e) {
+  console.log("抓住了:", e.message);
+}</code></pre></div>
+<p>异步的错误处理<strong>没有第二套模型</strong>：<code>try/catch/finally</code> 原样适用。这是 await 比回调优雅的重要原因之一——回调风格里每个嵌套层都得单独传错误。</p>
+
+<h4>⑦ 动手练习（就在 Playground 里做）</h4>
+<ol>
+  <li>用 <code>sleep</code> 写"下载 → 分析 → 入库"三步顺序流程，每步打印时间戳（用 <code>Date.now()</code>），确认是顺序执行的。</li>
+  <li>把其中一个 <code>await</code> 删掉再跑，观察输出顺序怎么乱掉——理解 <code>await</code> 到底管住了什么。</li>
+</ol>
+
+<h3 id="ts-s8"><div class="section-head">2 · Promise：代表"未来值"的对象 <button class="done-btn" data-section="ts-s8">标记完成</button></div></h3>
+
+<p>上一节你已经在用 Promise 了——<code>sleep(300)</code> 返回的就是它，<code>await</code> 等的就是它。本节把它讲透：<strong>Promise 是一个对象，代表一个"现在还没有、将来才会有（或者失败）"的结果。</strong>它是异步体系里传递"未来的值"的载体：异步函数之间交接结果、做并发编排、加超时和取消，全靠它。</p>
+
+<h4>① 是什么：一台三态的状态机</h4>
+<div class="pre-wrap"><pre data-lang="text"><code>                 ┌──────────┐
+   创建 ───────→ │ pending  │  进行中
+                 └────┬─────┘
+                      │（只迁移一次，不可逆）
+          ┌───────────┴────────────┐
+          ▼                        ▼
+     fulfilled                rejected
+   （成功，带一个值）       （失败，带一个原因）</code></pre></div>
+<p>两条铁律：</p>
+<ol>
+  <li><strong>状态只迁移一次，且不可逆。</strong>fulfilled 之后不会再变成 rejected，反之亦然。</li>
+  <li><strong>已落定（settled）的 Promise，结果会被缓存。</strong>再 await 立即拿到，不重新执行任何东西。</li>
+</ol>
+<div class="pre-wrap"><pre data-playground><code>const p = new Promise((resolve) =&gt; setTimeout(() =&gt; resolve(42), 300));
+// 此刻 p 是 pending
+
+const v = await p;                    // 等到 fulfilled，v = 42
+console.log("第一次 await:", v);
+console.log("再 await 一次:", await p);  // 立即返回 42——结果被缓存，没有再等 300ms</code></pre></div>
+
+<h4>② await 的操作语义：机械的 4 步</h4>
+<p><code>const x = await expr;</code> 到底发生了什么：</p>
+<ol>
+  <li><strong>求值 expr</strong> 得到值 v。如果 v 不是 Promise，先包一层 <code>Promise.resolve(v)</code>（所以 <code>await 42</code> 也合法）。</li>
+  <li><strong>暂停当前 async 函数</strong>：把"await 之后的全部剩余代码"打包成续体（continuation），注册到 v 上，控制权交还给事件循环。</li>
+  <li><strong>事件循环去跑别的任务</strong>，直到 v 落定。</li>
+  <li><strong>按结局恢复</strong>：v fulfilled → 从暂停处恢复，表达式的值就是结果；v rejected → 在 await 这一点<strong>抛出异常</strong>（所以 try/catch 能接）。</li>
+</ol>
+<div class="pre-wrap"><pre data-playground><code>// 精确细节：await 即使等一个【已完成】的 Promise，也会让出一次
+async function f() {
+  console.log("A: f 开始");
+  await Promise.resolve("x");   // 已 fulfilled，照理"不用等"
+  console.log("C: f 恢复");
+}
+console.log("1: 调用前");
+f();
+console.log("2: 调用后同步代码");
+// 输出：1, A, 2, C —— C 排在 2 后面！
+// await 点之后的代码，一定排在当前这轮同步代码之后</code></pre></div>
+
+<h4>③ 追问：await 交出了主动权，为什么后面的代码还是按顺序执行？</h4>
+<p>因为 <strong>await 交出的是线程的使用权，不是自己代码的执行顺序</strong>。暂停时，"之后的代码"被打包成续体挂在 Promise 上——<strong>Promise 不落定，续体就不会跑</strong>。函数内部的顺序由续体链严格保证：</p>
+<div class="pre-wrap"><pre><code>await ticker;                       // ticker 不落定 ↓
+console.log("[最终]: " + text);     // ← 这行就不可能执行
+// "最终"是 await ticker 的续体：不是"碰巧"最后打印，
+// 是 ticker 的 Promise fulfilled 之后，它才有资格被排上队</code></pre></div>
+<p>那"让出"到底让出了什么？<strong>让出的是线程</strong>——冻结期间线程去跑别的任务。交错只发生在<strong>不同任务之间</strong>；每个任务内部顺序纹丝不动。第 3 节的心跳 demo 会让你看到两根任务进度条的交错。</p>
+<div class="callout key">
+  <strong>推论：想判断你的代码何时执行，只需数它前面有几个 await、各自在等什么 Promise</strong>——顺序信息全在代码里，没有隐藏的并发陷阱。
+</div>
+
+<h4>④ .then 与 catch：await 底下的机制（读懂即可）</h4>
+<p><code>.then(onOk)</code> / <code>.catch(onErr)</code> / <code>.finally(cb)</code> 是注册"落定后调用"的回调，返回新 Promise 所以能链式。老代码和库里常见，<strong>能读懂即可，新代码一律用 await</strong>：线性可读、错误处理统一走 try/catch。</p>
+<div class="pre-wrap"><pre><code>// 同一件事的两种写法
+const v1 = await fetchData();                      // await 风格（推荐）
+fetchData().then((v2) =&gt; console.log(v2));          // then 风格（读懂即可）
+
+// 对应关系：try/catch ≈ then/catch
+try { await risky(); } catch (e) { /* 处理失败 */ }
+risky().then(ok).catch((e) => { /* 同一个位置 */ });</code></pre></div>
+
+<h4>⑤ 怎么得到一个 Promise</h4>
+<ol>
+  <li><strong>现代异步 API 直接返回 Promise</strong>：<code>fetch()</code>、<code>fs.promises.readFile()</code>……拿来就 await，这是最常见的情况。</li>
+  <li><strong>调用任何 async 函数</strong>，返回值一定是 Promise。注意它是"热的"——<strong>函数体立即执行到第一个 await</strong>（第 1 节⑤），不存在"await 了才开始跑"的惰性语义。</li>
+  <li><strong>自己包装回调风格的老 API</strong>：用 <code>new Promise(executor)</code>，见下面小节。</li>
+</ol>
+
+<h4>Promise 是怎么造出来的：executor 与 resolve（r 是什么）</h4>
+<p><code>new Promise((r) =&gt; setTimeout(r, ms))</code>——<code>r</code> 是什么、从哪来？<code>new Promise(executor)</code> 的构造器接收你写的函数（术语叫 <strong>executor</strong>），<strong>立即同步调用它</strong>，并把两个由 Promise 内部创建的函数传进去，约定叫 <code>resolve</code> 和 <code>reject</code>（<code>r</code> 只是 resolve 的简写变量名，叫什么都行）。<strong>你不是创造 r，你是接收 r。</strong></p>
+<div class="pre-wrap"><pre data-playground><code>// Promise ≈ 一个"未来值的盒子"，executor 是你往盒子里装东西的机会
+const p = new Promise((resolve, reject) =&gt; {
+  setTimeout(() =&gt; resolve("叮"), 300);  // 300ms 后把 "叮" 放进盒子 → fulfilled
+  // reject(new Error("坏了"));          // 若走这条 → rejected，await 处抛异常
+});
+const v = await p;
+console.log(v);      // "叮"
+
+// 为什么 setTimeout(r, 500) 能直接传 r？
+// "到时调用 fn()" 和 resolve 的调用签名恰好兼容（多传的参数被忽略）
+await new Promise((r) =&gt; setTimeout(r, 500));
+console.log("至少 500ms 过去了");</code></pre></div>
+<div class="callout key">
+  <strong>什么时候需要手写 new Promise？</strong>只有把<strong>回调风格的老 API</strong>（setTimeout、事件监听、Node 回调）包装成可 await 的形式时。
+  现代 API（fetch、fs/promises）直接返回 Promise，不用自己包。所以 <code>new Promise</code> 高频出现在"胶水层"，业务代码里少见。
+</div>
+
+<h4>⑥ 组合器：并发编排的四件套</h4>
+<table>
+  <tr><th>组合器</th><th>语义</th><th>什么时候用</th></tr>
+  <tr><td><code>Promise.all</code></td><td>全部成功才成功；一个失败立即整体失败</td><td>任务缺一不可：批量下载，少一个就没法继续</td></tr>
+  <tr><td><code>Promise.allSettled</code></td><td>等全部结束，成败都收集成数组</td><td>允许部分失败：分析 100 个素材，失败的记下来继续</td></tr>
+  <tr><td><code>Promise.race</code></td><td>谁先<strong>落定</strong>用谁（含失败）</td><td>超时控制</td></tr>
+  <tr><td><code>Promise.any</code></td><td>谁先<strong>成功</strong>用谁；全败才失败</td><td>多个镜像源取最快的那个</td></tr>
+</table>
+<p>亲手感受并发——三个任务一起出发，总耗时 ≈ 最慢的一个：</p>
+<div class="pre-wrap"><pre data-playground><code>const delay = (ms) =&gt; new Promise((r) =&gt; setTimeout(r, ms));
+
+async function download(name, ms) {
+  console.log(name, "开始下载");
+  await delay(ms);              // ← 让出控制权，事件循环去跑别的任务
+  console.log(name, "下载完成");
+}
+
+console.log("=== 并发启动三个下载 ===");
+await Promise.all([
+  download("kick.wav", 500),
+  download("snare.wav", 200),
+  download("hihat.wav", 800),
+]);
+console.log("=== 全部完成 ===");
+
+// 观察输出顺序：开始是启动顺序，完成是耗时顺序（snare 最先完成）
+// 这就是并发：三个任务交替推进，等待时间重叠
+// 再把 Promise.all 换成 for...of 逐个 await，对比总耗时</code></pre></div>
+<p>实用模式——用 <code>race</code> 给任何 Promise 加超时：</p>
+<div class="pre-wrap"><pre data-playground><code>function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =&gt; setTimeout(() =&gt; reject(new Error("超时")), ms)),
+  ]);
+}
+
+const slowTask = new Promise((r) =&gt; setTimeout(() =&gt; r("慢任务完成"), 2000));
+try {
+  console.log(await withTimeout(slowTask, 500));
+} catch (e) {
+  console.log("捕获:", e.message);   // 500ms 时超时先落定 → "捕获: 超时"
+}</code></pre></div>
+<div class="callout warn">
+  <strong>单位坑：</strong><code>setTimeout</code> 的延迟参数是<strong>毫秒</strong>（1995 年 Netscape 的历史），<code>setTimeout(r, 1)</code> 只等 1 毫秒。JS 里时间 API 几乎都是毫秒（<code>Date.now()</code>、<code>performance.now()</code>）；音频领域例外：<strong>Web Audio 的 <code>AudioContext.currentTime</code> 是秒</strong>，写音频代码时特别小心。
+  另外这个数值是<strong>最少等待</strong>不是精确等待：定时器到点只负责把任务排进队列，事件循环被占时会推迟（下一节讲队列）。
+</div>
+
+<h4>⑦ 什么时候用 Promise，什么时候不用</h4>
+<p><strong>用：</strong></p>
+<ul>
+  <li>一切 I/O：网络请求、文件读写、定时器、子进程、LLM 流式响应——等待期间事件循环可以去干别的。</li>
+  <li>需要并发编排时：多个 I/O 任务并行、超时、竞速、取消。</li>
+  <li>需要把"未来的值"当对象传递时：存进数组、挂到对象上、多处 await 共享同一个结果。</li>
+</ul>
+<p><strong>不用：</strong></p>
+<ul>
+  <li><strong>CPU 密集计算。</strong><code>await</code> 不会让计算让出线程——10 秒的傅里叶变换照样冻结页面 10 秒（下一节解释为什么）。这种活交给 Worker，不是 Promise。</li>
+  <li><strong>纯线性同步流程。</strong>几件本来就瞬间完成的事，直接写同步代码，包 Promise 只是噪音。</li>
+</ul>
+
+<h4>⑧ 三个高频错误</h4>
+<ol>
+  <li><strong>忘记 await。</strong>拿到的是一个 Promise 对象而不是结果；<code>if (promise)</code> 恒为真（对象是真值）。类型系统能抓大部分，但逻辑错误抓不到。pi 里 <code>void runAgentLoop(...)</code> 的 <code>void</code> 前缀是"我故意不 await"的显式声明。</li>
+  <li><strong>forEach 里 await 不等待。</strong><code>items.forEach(async ...)</code> 立即返回、任务并发飞出没人收尸——第 3 节有实测。</li>
+  <li><strong>以为 Promise "被 await 才开始"。</strong>创建即执行（热启动），await 只是等结果。两个任务想并发，先都创建出来再 await；写一个 await 一个就是串行。</li>
+</ol>
+
+<h3 id="ts-s7b"><div class="section-head">3 · 底下的机制：事件循环、协程与生成器 <button class="done-btn" data-section="ts-s7b">标记完成</button></div></h3>
+
+<p>第 1、2 节你学会了"怎么用"。这一节掀开盖子：await 暂停之后<strong>到底是谁在调度</strong>？为什么计算会卡死页面？为什么说"async 函数是可以暂停的函数"是精确描述？</p>
+
+<h4>① 先立词汇：串行 / 并发 / 并行 × 同步 / 异步</h4>
+<p>这几个词容易混淆，因为它们不在同一根轴上：</p>
+<table>
+  <tr><th>概念</th><th>含义</th><th>类比（餐厅）</th></tr>
+  <tr><td><strong>串行</strong></td><td>做完一件再做下一件</td><td>一个服务员，服务完一桌才理下一桌</td></tr>
+  <tr><td><strong>并发 concurrency</strong></td><td>多个任务交替推进，同一时刻只干一件</td><td>一个服务员，在几桌之间来回跑</td></tr>
+  <tr><td><strong>并行 parallelism</strong></td><td>多个任务同一时刻真的同时跑</td><td>多个服务员同时干活</td></tr>
+</table>
+<ul>
+  <li><strong>串行 / 并发 / 并行</strong> 描述的是"<strong>任务怎么被调度推进</strong>"（结构问题）。</li>
+  <li><strong>同步 / 异步</strong> 描述的是"<strong>等待结果时让不让出执行权</strong>"（机制问题）。</li>
+</ul>
+<p>关系是：<strong>异步是实现并发的一种机制</strong>——单线程也能并发，靠"等 I/O 时切换任务"（这个切换机制叫事件循环，下一小节讲）。但并发不只有异步一条路：多线程也能并发（操作系统抢占式切换）。而并行是另一回事：需要多核硬件，是"真的同时"。Rob Pike 的经典表述：</p>
+<div class="callout">
+  <strong>Concurrency is about dealing with lots of things at once. Parallelism is about doing lots of things at once.</strong><br>
+  并发是"同时应对很多事"（结构），并行是"同时做很多事"（执行）。并行天然是并发，并发不一定是并行。
+</div>
+<div class="callout key">
+  <strong>async 是并发模型，不是并行。</strong>它只有一条线程在跑代码，靠"等待时切换任务"挤出来的时间。
+  想真正利用多核 CPU（比如音频 DSP 批量渲染），async 帮不了你，那是多进程/Worker 的领域。
+</div>
+
+<h4>② 事件循环：一个永不停歇的调度员</h4>
+<p>异步的运行机制叫<strong>事件循环（event loop）</strong>，心智模型就三条：</p>
+<ol>
+  <li>只有<strong>一条线程</strong>执行你的代码，外面挂着一个任务队列。</li>
+  <li>一个任务一旦开始跑，<strong>只有跑到 <code>await</code> 才主动让出</strong>控制权（术语：协作式调度）。调度员绝不会在代码中途抢控制权。</li>
+  <li><code>await</code> 让出后，调度员从队列里挑下一个能跑的任务（比如某个网络响应到达了）；你的 I/O 完成后，你的任务被排回队列，轮到后从 <code>await</code> 的下一行继续。</li>
+</ol>
+<div class="callout warn">
+  <strong>推论（生产事故的常客）：任何长时间的纯计算都会卡死整个程序。</strong>
+  因为没人让出控制权，其他所有任务（包括 UI 响应！）全部饿死。JS 里一个 10 秒的 while 循环 = 页面冻结 10 秒。
+</div>
+<p>把 JS 的运行机制放进这个模型，一张表看清：</p>
+<table>
+  <tr><th>机制</th><th>并发？</th><th>并行？</th><th>切换方式</th></tr>
+  <tr><td>JS <code>async/await</code></td><td>✓</td><td>✗（单线程）</td><td>协作式：只在 <code>await</code> 点切换</td></tr>
+  <tr><td>JS Web Worker / Node worker_threads</td><td>✓</td><td><strong>✓</strong></td><td>OS 调度</td></tr>
+</table>
+
+<h4>③ 交错执行的证据：心跳实验</h4>
+<p>"事件循环在等待时去跑别的任务"——别停留在字面上，跑这个实验亲眼看：</p>
+<div class="pre-wrap"><pre data-playground><code>const t0 = Date.now();
+const el = () => ((Date.now() - t0) / 1000).toFixed(1) + "s";
+
+async function slowTask() {
+  console.log("[" + el() + "] 慢任务开始，要等 1.2s");
+  await new Promise((r) =&gt; setTimeout(r, 1200));
+  console.log("[" + el() + "] 慢任务结束");
+}
+
+// 同一个事件循环上同时跑一个心跳任务
+const ticker = (async () => {
+  for (let i = 1; i &lt;= 4; i++) {
+    await new Promise((r) =&gt; setTimeout(r, 250));
+    console.log("  [" + el() + "] 心跳 " + i + "：慢任务等待期间，别的事照常在跑");
+  }
+})();
+
+await slowTask();
+await ticker;
+// 输出：心跳 1-4 穿插在"慢任务开始"和"慢任务结束"之间——
+// 慢任务的 1.2s 等待被心跳"免费"利用了。这就是"不阻塞"。</code></pre></div>
+
+<h4>④ yield：会"暂停"的函数（生成器）</h4>
+<p>普通函数一旦调用就跑到 return 为止，中间停不下来。生成器（<code>yield</code>）打破这一点：<strong>每次 yield 就是一次"暂停并交出控制权"，下次被催时从暂停处继续</strong>。</p>
+<div class="pre-wrap"><pre data-playground><code>function* task() {
+  console.log("第 1 步");
+  yield;
+  console.log("第 2 步");
+  yield;
+  console.log("第 3 步");
+}
+const t = task();  // 什么都不打印！生成器只是被创建
+console.log("创建完毕");
+t.next();          // 打印"第 1 步"
+t.next();          // 打印"第 2 步"</code></pre></div>
+<p>注意：<strong>调用生成器函数不会执行函数体</strong>，只造出一个"待驱动"的对象；由外部（<code>next()</code> 或 <code>for</code> 循环）一步一步驱动。<strong>生成器同时也是迭代器</strong>（实现了第 1 课第 8 节的迭代器协议），所以能被 <code>for...of</code> 和 <code>[...展开]</code> 直接消费：</p>
+<div class="pre-wrap"><pre data-playground><code>// 生成器产出值：fibonacci
+function* fibonacci(n) {
+  let a = 0, b = 1;
+  for (let i = 0; i &lt; n; i++) {
+    yield a;
+    [a, b] = [b, a + b];   // 解构交换
+  }
+}
+console.log([...fibonacci(10)]);   // 展开收集所有 yield 的值</code></pre></div>
+
+<h4>⑤ 从 yield 到 await：协程就是"被事件循环驱动的生成器"</h4>
+<p>这是理解一切的关键一步。<strong>async 函数 ≈ 一种特殊的生成器：<code>await</code> 就是它的"yield 点"，但驱动它的不是 <code>next()</code>，而是事件循环。</strong></p>
+<div class="pre-wrap"><pre data-lang="text"><code>生成器：  function* → 在 yield 暂停 → 外部 next() 驱动继续
+协程：    async function → 在 await 暂停 → 事件循环在 Promise 落定后驱动继续</code></pre></div>
+<p>这不是比喻：早期的协程实现就是在生成器机制上长出来的，后来才有了 <code>async/await</code> 专用语法。所以"async 函数 = 可以在 await 点暂停的函数"是精确描述，不是粗略类比。</p>
+
+<h4>⑥ async 函数的三个关键事实</h4>
+<div class="pre-wrap"><pre data-playground><code>// 事实 1：async 函数调用后【立即执行到第一个 await】才暂停
+async function f() {
+  console.log("我开始执行了");   // f() 一调用就打印
+  await new Promise((r) =&gt; setTimeout(r, 500));
+  console.log("我醒来了");
+}
+f();  // 立即看到"我开始执行了"
+
+// 事实 2：事件循环永远在跑，不需要入口手续，顶层 await 合法
+//（这个 Playground 就是这么实现的）
+
+// 事实 3：async 函数总是返回 Promise（承诺对象）
+const p = f();   // p 是一个 Promise：代表"未来会有一个结果"的承诺
+
+// Promise 三态：pending（进行中）→ fulfilled（成功）/ rejected（失败）
+// await p → 拿到结果；如果 rejected → await 处抛异常，用 try/catch 接</code></pre></div>
+
+<h4>⑦ 推论区：机制讲完了，回头看这些结论</h4>
+<div class="callout key">
+  <strong>协作式切换送你一个礼物：await 点之间是"原子"的。</strong>
+  两个 <code>await</code> 之间的同步代码绝不会被其他任务插入——因为调度员只在 await 点接手。
+  这就是异步代码比多线程好写太多的原因（没有锁、没有数据竞争），也是第 3 课 agent loop 里直接 <code>context.messages.push(...)</code> 而不用任何锁的原因。
+  反过来说：<strong>你的代码只会在 await 点被"打断"</strong>，排查并发问题时只看 await 的位置就够了。
+</div>
+<p><strong>追问：最底层看，并行 = 多核同时处理，单核最多并发？</strong>正确，加两个修正和一个注脚：</p>
+<ol>
+  <li><strong>并行通常是"同时处理多个任务"</strong>——单个任务想吃并行红利必须本身可拆分。批量渲染 100 个 wav 天然可拆（每核领一批）；"渲染一个 wav"能不能拆取决于算法。所以并行编程的核心难题是任务分解。</li>
+  <li><strong>单核上的"交替"有两种实现</strong>：OS 时间片（抢占式，随时打断）vs 事件循环（协作式，只在 await 让出）——就是 ② 那张表里"切换方式"一列。</li>
+</ol>
+<p>底层注脚：单核内部其实有流水线/超标量/超线程等"小并行"，但那是硬件对指令流的透明优化，不改变编程模型。你的领域还有个重要例外：<strong>GPU</strong>——几千个小核，天生并行；可向量化的音频运算（卷积混响、FFT）放 GPU 上比开多进程高几个量级。</p>
+<div class="callout key">
+  <strong>一句话总结：</strong>单核只能并发（交替），多核才能并行（真同时）但任务要可拆分；
+  异步的价值与核数无关——它回收的是"等 I/O"的时间，那段时间 CPU 本来就在空转。
+</div>
+
+<div class="callout key">
+  <strong>与 pi 的连接：</strong>LLM 流式响应（<code>for await</code> 消费）、工具并行执行（<code>Promise.all</code>）、API key 异步刷新、AbortSignal 取消——
+  agent 框架的每一层都是 I/O 密集 + 事件循环。现在回头看第 3 课的 <code>streamAssistantResponse</code>，你应该能看懂它为什么全程 async 了。
+</div>
+
+<h3 id="ts-s8b"><div class="section-head">4 · for await 与异步迭代器：pi 流式架构的基础 <button class="done-btn" data-section="ts-s8b">标记完成</button></div></h3>
+
+<h4>异步生成器：可以 await 的生成器</h4>
+<p>生成器（第 3 节④）加上 <code>async</code>，就能在 <code>yield</code> 之间 <code>await</code>——产出值可以慢、可以等 I/O。消费它用 <code>for await</code>。这就是 LLM 流式输出的模型：</p>
+<div class="pre-wrap"><pre data-playground><code>// 模拟 LLM 流式响应：异步生成器一块一块吐文本
+async function* fakeLlmStream() {
+  const chunks = ["你好", "，我是", " pi", "。"];
+  for (const c of chunks) {
+    await new Promise((r) =&gt; setTimeout(r, 300));  // 模拟网络延迟
+    yield c;
+  }
+}
+
+let text = "";
+for await (const chunk of fakeLlmStream()) {
+  text += chunk;
+  console.log("收到:", chunk, "→ 累计:", text);
+}
+console.log("最终:", text);</code></pre></div>
+
+<p><strong>追问：这段代码耗时和串行一样（1200ms+），异步体现在哪？</strong>观察得对——它本来就该一样慢。这里要把异步的两种收益分开：</p>
+<ul>
+  <li><strong>收益① 并发（省总时间）</strong>：多个<strong>互相独立</strong>的任务，等待时间重叠 → 总耗时下降。这是 <code>Promise.all</code> 干的事（第 2 节⑥实测过）。</li>
+  <li><strong>收益② 流式 + 不阻塞（省的是别的东西）</strong>：<code>fakeLlmStream</code> 是<strong>一个</strong>任务，4 个 chunk 有内在顺序（真实 LLM 也一样：第 100 个 token 必须在第 99 个之后生成），1200ms 无法压缩。<strong>这不是缺陷，是流式的本质。</strong>它省的是：① <strong>边到边用</strong>——300ms 时就拿到第一个 chunk，不用等全部（LLM 逐字输出 vs 干等 20 秒空白）；② <strong>等待期间事件循环是自由的</strong>——4 个 300ms 的空档可以被别的任务"免费"利用。</li>
+</ul>
+<p>第②点光看上面的 demo 感受不到，加一个同时跑的"心跳"任务让证据可见：</p>
+<div class="pre-wrap"><pre data-playground><code>const t0 = Date.now();
+const el = () => ((Date.now() - t0) / 1000).toFixed(1) + "s";
+
+async function* fakeLlmStream() {
+  for (const c of ["你好", "，我是", " pi", "。"]) {
+    await new Promise((r) =&gt; setTimeout(r, 300));
+    yield c;
+  }
+}
+
+// 同一个事件循环上同时跑一个心跳任务
+const ticker = (async () =&gt; {
+  for (let i = 1; i &lt;= 5; i++) {
+    await new Promise((r) =&gt; setTimeout(r, 200));
+    console.log("  [" + el() + "] 心跳 " + i + "：别的事照常在跑");
+  }
+})();
+
+let text = "";
+for await (const chunk of fakeLlmStream()) {
+  text += chunk;
+  console.log("[" + el() + "] 收到: " + chunk);
+}
+await ticker;
+console.log("[" + el() + "] 最终: " + text);
+
+// 输出里心跳（200ms）和 chunk（300ms）交错出现——
+// 流式的总耗时仍是 1.2s，但心跳的工作被"免费"塞进了流式的等待空档里。
+// 这就是"不阻塞"的含义：总时间没变，等待时间不再浪费。</code></pre></div>
+
+<h4>循环里的异步调度：串行 vs 并行（实测）</h4>
+<p>同一个 <code>await</code>，写在不同的循环结构里，调度行为完全不同——这是读 agent-loop.ts 工具执行代码的必备认知：</p>
+<div class="pre-wrap"><pre data-playground><code>const delay = (ms) =&gt; new Promise((r) =&gt; setTimeout(r, ms));
+
+// 串行等待：for...of 里 await 是"一个一个来"
+let t0 = Date.now();
+for (const x of [1, 2, 3]) {
+  await delay(200);
+}
+console.log("for...of 串行耗时:", Date.now() - t0, "ms ≈ 600");
+
+// 并发：Promise.all + map 是"一起出发"
+t0 = Date.now();
+await Promise.all([1, 2, 3].map(async (x) =&gt; {
+  await delay(200);
+}));
+console.log("Promise.all 并行耗时:", Date.now() - t0, "ms ≈ 200");
+
+// 反面教材：forEach 里 await 不会等待！
+// [1,2,3].forEach(async (x) =&gt; await delay(200));
+// ↑ forEach 立即返回，三个任务并发飞出还没人收尸</code></pre></div>
+<div class="callout key">
+  <strong>这正是 pi 的工具执行调度：</strong>串行模式用 <code>for (const toolCall of toolCalls) { await ... }</code>，
+  并行模式用 <code>Promise.all(calls.map(...))</code>。你在第 3 课读 <code>executeToolCallsSequential/Parallel</code> 时会再次看到这个选择。
+</div>
+<div class="callout key">
+  <strong>和第 3 课的连接：</strong><code>streamAssistantResponse</code> 里的 <code>for await (const event of response)</code> 就是在消费这样一个异步迭代器——
+  <code>response</code>（EventStream）是一块一块吐出 LLM 事件的异步数据源。理解了生成器 + for await，pi 的流式架构就没有魔法了。
+</div>
+    `,
+  },
+
+  // ============================================================
+  // 第 3 课：agent-loop 精读
+  // ============================================================
+  {
+    id: "lesson-loop",
+    title: "第 3 课 · Agent 的本质",
+    sub: "agent-loop 精读：手搓版没有的 6 件事",
+    html: `
+<div class="lesson-header">
+  <div class="lesson-tag">LESSON 03</div>
+  <h2>Agent 的本质：agent-loop 精读</h2>
+  <div class="meta">教材：<span class="file-ref">packages/agent/src/agent-loop.ts</span>（792 行，pi 的心脏）</div>
+</div>
+
+<div class="callout key">
+  <strong>前置：</strong>你用 Python 手搓过 agent loop，核心骨架（<code>while: stream → 收集 tool_calls → 执行 → 回填</code>）
+  在 <code>runLoop</code> 里完全一样。本课只讲你手搓版大概率没有的工程细节。
+</div>
+
+<h3 id="l1-s2"><div class="section-head">手搓版大概率没有的 6 件事 <button class="done-btn" data-section="l1-s2">标记完成</button></div></h3>
+
+<h4>① 事件流是产品的边界（最重要的架构决策）</h4>
+<p><code>runLoop</code> <strong>从不打印任何东西</strong>，只通过 <code>emit</code> 吐出 <code>AgentEvent</code>，返回值是 <code>EventStream&lt;AgentEvent, AgentMessage[]&gt;</code>：</p>
+<div class="pre-wrap"><pre data-lang="text"><code>agentLoop(...) → EventStream ─┬─→ TUI 订阅渲染（packages/tui）
+                              ├─→ Electron/React 订阅（你的产品）
+                              └─→ 测试断言（test/suite）</code></pre></div>
+<div class="callout key">
+  <strong>设计原则 #1：核心逻辑与 UI 完全通过事件解耦。</strong>
+  你将来用 Electron 开发音频 agent，核心应该一行 UI 依赖都没有，React 组件订阅同样的事件流。
+  这也直接回答了"如何评估"——测试就是订阅事件流然后断言事件序列。
+</div>
+
+<h4>② 双层循环：steering 与 follow-up</h4>
+<div class="pre-wrap"><pre data-lang="text"><code>外层 while(true)            ← getFollowUpMessages：干完活后队列里还有新任务吗？
+  内层 while(tools||pending) ← getSteeringMessages：干活中用户插话了吗？</code></pre></div>
+<p>手搓 loop 假设"用户说完 → agent 跑完 → 用户再说"。真实产品里用户会在 agent 执行中途打字（"别改那个文件"），这些消息被注入到<strong>下一个 LLM 调用之前</strong>。这是交互式 agent 和脚本式 agent 的分水岭。</p>
+
+<h4>③ 截断保护</h4>
+<div class="pre-wrap"><pre><code>message.stopReason === "length"
+  ? await failToolCallsFromTruncatedMessage(toolCalls, emit)  // 全部标错，不执行
+  : await executeToolCalls(...)</code></pre></div>
+<p>输出 token 用光时，流式 tool call 的参数 JSON 会被截断，salvage parser 可能解析出"看起来合法但悄悄缺字段"的参数（比如 <code>edit</code> 的 <code>newText</code> 少了一半）。<strong>pi 的选择：一个都不执行，把错误反馈给模型让它重发。</strong>"模型输出不可信，必须防御"的思维贯穿整个仓库。</p>
+
+<h4>④ 工具执行的三段管线 + 两种调度</h4>
+<p><code>prepare → execute → finalize</code>，外加 parallel / sequential（<code>executionMode</code> 由工具自己声明：<code>edit</code> 必须串行，<code>read</code> 可以并行）。</p>
+<ul>
+  <li><strong>prepare</strong>：找工具、schema 校验参数、跑 <code>beforeToolCall</code> 钩子（可 block）。全部错误都<strong>转成 toolResult 喂回模型而不是抛出</strong>——模型看到 "Tool xxx not found" 会自己纠正，这是 agent 自愈的关键。</li>
+  <li><strong>execute</strong>：执行中可发 <code>tool_execution_update</code> 部分结果（如 bash 流式输出）。</li>
+  <li><strong>finalize</strong>：<code>afterToolCall</code> 钩子可改写结果（如裁剪超长输出）。</li>
+  <li><strong>terminate 标志</strong>：工具可以说"到此为止，别再调用 LLM 了"。</li>
+</ul>
+
+<h4>⑤ AbortSignal 贯穿一切</h4>
+<p><code>signal</code> 从 UI 一路传到 LLM 流和每个工具执行。用户按 <span class="kbd">Esc</span> → 所有 HTTP 请求和子进程被取消。检查点散布 loop 各处（<code>if (signal?.aborted) break</code>）。<strong>取消是 agent 产品的一等功能</strong>，不是事后补丁。</p>
+
+<h4>⑥ 扩展点全部走 config 回调</h4>
+<p><code>AgentLoopConfig</code> 的钩子清单，就是这个 loop 的全部"政策"：</p>
+<table>
+  <tr><th>钩子</th><th>用途</th></tr>
+  <tr><td><code>transformContext</code></td><td>发给 LLM 前改写消息历史（compaction 挂在这）</td></tr>
+  <tr><td><code>convertToLlm</code></td><td>内部消息格式 → provider 格式</td></tr>
+  <tr><td><code>getApiKey</code></td><td>每次调用前解析 key（OAuth token 过期刷新）</td></tr>
+  <tr><td><code>prepareNextTurn</code></td><td>每轮后改模型 / thinking level</td></tr>
+  <tr><td><code>shouldStopAfterTurn</code></td><td>自定义停止条件</td></tr>
+  <tr><td><code>beforeToolCall / afterToolCall</code></td><td>权限拦截、结果改写</td></tr>
+</table>
+<div class="callout key">
+  <strong>loop 本身不变，行为全靠注入。</strong>这是 pi 扩展系统（<span class="file-ref">packages/coding-agent/src/extensions</span>）能存在的原因——也是你设计自己 agent 产品最该抄的模式。
+</div>
+
+<h3 id="l1-hw"><div class="section-head">作业（选一即可） <button class="done-btn" data-section="l1-hw">标记完成</button></div></h3>
+<div class="homework">
+  <h4>二选一，做完进第 3 课</h4>
+  <label class="hw-check"><input type="checkbox" data-hw="l1-hw1">
+    <span><strong>读码题：</strong>读 <span class="file-ref">packages/agent/src/types.ts</span>，找出 <code>AgentEvent</code> 的完整 union 定义，画出一次"用户提问 → 2 次工具调用 → 回答"的完整事件序列（<code>agent_start</code> → <code>agent_end</code>）。</span></label>
+  <label class="hw-check"><input type="checkbox" data-hw="l1-hw2">
+    <span><strong>动手题：</strong>用 TS 写一个 30 行迷你 loop——固定的假 <code>streamFn</code> 返回预设消息，支持 steering 注入。跑通它，同时练了 TS 语法和 loop 结构。</span></label>
+</div>
+    `,
+  },
+
+  // ============================================================
+  // 后续课程（锁定）
+  // ============================================================
+  {
+    id: "lesson-provider",
+    title: "第 4 课 · Provider 抽象",
+    sub: "packages/ai · langchain 的替代品",
+    locked: true,
+    html: "",
+  },
+  {
+    id: "lesson-harness",
+    title: "第 5 课 · Harness 工程",
+    sub: "工具系统 · compaction · skills · session",
+    locked: true,
+    html: "",
+  },
+  {
+    id: "lesson-product",
+    title: "第 6 课 · 产品化",
+    sub: "扩展系统 · modes · UI 解耦（→ Electron）",
+    locked: true,
+    html: "",
+  },
+  {
+    id: "lesson-evals",
+    title: "第 7 课 · 评估 Agent",
+    sub: "packages/evals · faux provider · 确定性测试",
+    locked: true,
+    html: "",
+  },
+];
+
+// ===================== 进度存储 =====================
+const KEY = "pi-learning-progress-v1";
+const load = () => JSON.parse(localStorage.getItem(KEY) || "{}");
+const save = (s) => localStorage.setItem(KEY, JSON.stringify(s));
+let state = load();
+state.sections = state.sections || {};
+state.homework = state.homework || {};
+
+let currentLesson = state.currentLesson || "lesson-ts";
+if (!LESSONS.some(l => l.id === currentLesson && !l.locked)) currentLesson = "lesson-ts";
+
+// ===================== 渲染 =====================
+function renderNav() {
+  const nav = document.getElementById("nav");
+  nav.innerHTML = "";
+  for (const lesson of LESSONS) {
+    const el = document.createElement("a");
+    el.className = "nav-item" + (lesson.locked ? " locked" : "") + (lesson.id === currentLesson ? " active" : "");
+    const done = !lesson.locked && lessonDone(lesson.id);
+    el.innerHTML = `<div class="nav-title">${done ? '<span class="check">✓</span>' : ""}${lesson.title}</div>
+                    <div class="nav-sub">${lesson.sub}${lesson.locked ? " · 未解锁" : ""}</div>`;
+    if (!lesson.locked) el.onclick = () => {
+      currentLesson = lesson.id;
+      state.currentLesson = lesson.id;
+      save(state);
+      history.replaceState(null, "", "#" + lesson.id);
+      render();
+      window.scrollTo(0, 0);
+    };
+    nav.appendChild(el);
+  }
+}
+
+function lessonDone(lessonId) {
+  const lesson = LESSONS.find(l => l.id === lessonId);
+  if (!lesson || lesson.locked) return false;
+  const secIds = [...lesson.html.matchAll(/data-section="([^"]+)"/g)].map(m => m[1]);
+  return secIds.length > 0 && secIds.every(id => state.sections[id]);
+}
+
+function totalProgress() {
+  const allSecs = LESSONS.filter(l => !l.locked)
+    .flatMap(l => [...l.html.matchAll(/data-section="([^"]+)"/g)].map(m => m[1]));
+  if (!allSecs.length) return 0;
+  const done = allSecs.filter(id => state.sections[id]).length;
+  return Math.round(done / allSecs.length * 100);
+}
+
+function renderContent() {
+  const lesson = LESSONS.find(l => l.id === currentLesson);
+  const main = document.getElementById("content");
+  main.innerHTML = `<div class="toc" id="toc"></div><div class="article">` + lesson.html + `
+    <footer>
+      学习日志 · 教材来源：<span class="file-ref">pi-agent-workspace/pi</span> ·
+      进度保存在浏览器本地 · 随课程推进持续更新
+    </footer></div>`;
+  relocateDoneButtons(main);
+  buildToc(main);
+  renderQuizzes(main);
+
+  main.querySelectorAll(".done-btn").forEach(btn => {
+    const id = btn.dataset.section;
+    const status = main.querySelector(`.sec-status[data-for="${id}"]`);
+    if (state.sections[id]) {
+      btn.classList.add("done");
+      btn.textContent = "✓ 已完成";
+      if (status) { status.textContent = "✓"; status.classList.remove("pending"); }
+    } else if (status) {
+      status.textContent = "○";
+      status.classList.add("pending");
+    }
+    // 有测验且未通过 → 按钮锁住
+    if (QUIZZES[id] && !(state.quiz && state.quiz[id]) && !state.sections[id]) {
+      btn.disabled = true;
+      btn.textContent = "完成测验后解锁";
+    }
+    btn.onclick = () => {
+      state.sections[id] = !state.sections[id];
+      if (!state.sections[id]) delete state.sections[id];
+      save(state); render();
+    };
+  });
+  main.querySelectorAll("[data-hw]").forEach(cb => {
+    cb.checked = !!state.homework[cb.dataset.hw];
+    cb.onchange = () => { state.homework[cb.dataset.hw] = cb.checked; save(state); };
+  });
+  enhancePlaygroundBlocks(main);
+  highlightLessonCode(main);
+}
+
+// 把"标记完成"按钮从标题旁搬到章节尾部；标题只留完成状态标记
+function relocateDoneButtons(main) {
+  main.querySelectorAll(".article h3[id]").forEach((h) => {
+    const head = h.querySelector(".section-head");
+    const btn = head && head.querySelector(".done-btn");
+    if (!btn) return;
+    const secId = btn.dataset.section;
+    btn.remove();
+    const status = document.createElement("span");
+    status.className = "sec-status";
+    status.dataset.for = secId;
+    head.appendChild(status);
+    // 找本节的最后一个元素（到下一个 h3 或 footer 为止）
+    let last = h;
+    let node = h.nextElementSibling;
+    while (node && node.tagName !== "H3") { last = node; node = node.nextElementSibling; }
+    const tail = document.createElement("div");
+    tail.className = "section-tail";
+    tail.appendChild(btn);
+    last.after(tail);
+  });
+}
+
+// 本课目录：从 article 里的 h3 自动生成，带完成状态
+function buildToc(main) {
+  const toc = main.querySelector("#toc");
+  const heads = main.querySelectorAll(".article h3[id]");
+  if (!heads.length) { toc.style.display = "none"; return; }
+  let html = '<div class="toc-title">本课目录</div>';
+  heads.forEach((h) => {
+    const status = h.querySelector(".sec-status");
+    const secId = status ? status.dataset.for : null;
+    const done = !!(secId && state.sections[secId]);
+    const label = h.textContent.replace(/标记完成|✓ 已完成|✓|○/g, "").trim();
+    html += `<div class="toc-item${done ? " done" : ""}" data-target="${h.id}">` +
+            `<span class="toc-check">${done ? "✓" : ""}</span><span>${label}</span></div>`;
+  });
+  toc.innerHTML = html;
+  toc.querySelectorAll(".toc-item").forEach((el) => {
+    el.onclick = () => {
+      document.getElementById(el.dataset.target)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      history.replaceState(null, "", "#" + currentLesson + "/" + el.dataset.target);
+    };
+  });
+}
+
+function renderProgress() {
+  const pct = totalProgress();
+  document.getElementById("progress-fill").style.width = pct + "%";
+  document.getElementById("progress-pct").textContent = pct + "%";
+}
+
+// ===================== Playground =====================
+const DEFAULT_PG_CODE = [
+  "// TS Playground —— 类型注解随便写，运行前会被官方编译器擦掉",
+  "// 支持顶层 await。试试：",
+  "",
+  "interface AudioAsset {",
+  "  name: string;",
+  "  loudness: number; // LUFS",
+  "}",
+  "",
+  "const assets: AudioAsset[] = [",
+  '  { name: "explosion.wav", loudness: -8 },',
+  '  { name: "ui_click.wav", loudness: -20 },',
+  '  { name: "ambience.wav", loudness: -30 },',
+  "];",
+  "",
+  "const loud = assets.filter((a) => a.loudness > -15).map((a) => a.name);",
+  'console.log("响亮的素材:", loud);',
+  'console.log("全部合格吗:", assets.every((a) => a.loudness <= 0));',
+].join("\n");
+
+const pgPanel = document.getElementById("pg-panel");
+const pgEditor = document.getElementById("pg-editor");
+const pgHighlight = document.getElementById("pg-highlight");
+const pgOutput = document.getElementById("pg-output");
+let tsLoading = null;
+
+function loadTsCompiler() {
+  if (window.ts) return Promise.resolve();
+  if (tsLoading) return tsLoading;
+  tsLoading = new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "vendor/typescript.js";
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("编译器加载失败：vendor/typescript.js 不存在"));
+    document.head.appendChild(s);
+  });
+  return tsLoading;
+}
+
+// 编辑器高亮：透明 textarea 盖在高亮 pre 上
+function updateEditorHighlight() {
+  pgHighlight.innerHTML = hljs.highlight(pgEditor.value, { language: "typescript" }).value + "\n";
+}
+
+function openPlayground(code) {
+  if (code !== undefined) {
+    pgEditor.value = code;
+  } else if (!pgEditor.value) {
+    pgEditor.value = state.pgCode || DEFAULT_PG_CODE;
+  }
+  state.pgCode = pgEditor.value;
+  state.pgOpen = true;
+  save(state);
+  updateEditorHighlight();
+  pgPanel.classList.remove("pg-hidden");
+  updateAside();
+  pgOutput.textContent = "";
+  pgEditor.focus();
+  loadTsCompiler().catch(() => {}); // 后台预加载
+}
+
+function closePlayground() {
+  pgPanel.classList.add("pg-hidden");
+  updateAside();
+  state.pgOpen = false;
+  save(state);
+}
+
+// 侧边栏收起条件：手动隐藏 或 playground 打开
+function updateAside() {
+  const pgOpen = !pgPanel.classList.contains("pg-hidden");
+  document.querySelector("aside").classList.toggle("collapsed", !!state.navHidden || pgOpen);
+  document.getElementById("nav-show").classList.toggle("hidden", !state.navHidden);
+}
+
+document.getElementById("nav-hide").onclick = () => {
+  state.navHidden = true;
+  save(state);
+  updateAside();
+};
+document.getElementById("nav-show").onclick = () => {
+  state.navHidden = false;
+  save(state);
+  updateAside();
+};
+updateAside();
+
+function fmtVal(v) {
+  if (typeof v === "string") return v;
+  if (v === undefined) return "undefined";
+  if (v instanceof Error) return v.stack || String(v);
+  try { return JSON.stringify(v, null, 2) ?? String(v); } catch { return String(v); }
+}
+
+function setPgOutput(text) {
+  pgOutput.textContent = text;
+  pgOutput.scrollTop = pgOutput.scrollHeight;  // 自动跟随到最新输出
+}
+
+async function runPlayground() {
+  setPgOutput("编译中…（首次运行需加载 9MB 编译器）");
+  try { await loadTsCompiler(); } catch (e) { setPgOutput(String(e)); return; }
+  let js;
+  try {
+    js = window.ts.transpileModule(pgEditor.value, {
+      compilerOptions: { module: window.ts.ModuleKind.None, target: window.ts.ScriptTarget.ES2022 },
+    }).outputText;
+  } catch (e) {
+    setPgOutput("编译错误: " + (e instanceof Error ? e.message : String(e)));
+    return;
+  }
+  const lines = [];
+  // 流式渲染：边执行边显示，迟到的 log（比如主函数结束后才触发的定时器）也能看到
+  const render = () => setPgOutput(lines.join("\n"));
+  const fakeConsole = {
+    log: (...a) => { lines.push(a.map(fmtVal).join(" ")); render(); },
+    error: (...a) => { lines.push("[error] " + a.map(fmtVal).join(" ")); render(); },
+    warn: (...a) => { lines.push("[warn] " + a.map(fmtVal).join(" ")); render(); },
+  };
+  try {
+    const fn = new Function("console", '"use strict"; return (async () => {\n' + js + '\n})();');
+    await fn(fakeConsole);
+    if (!lines.length) setPgOutput("(无输出 —— 试试 console.log)");
+  } catch (e) {
+    lines.push("[运行时错误] " + (e instanceof Error ? e.message : String(e)));
+    render();
+  }
+}
+
+// 编辑后统一收尾：高亮 + 保存 + 补全
+function afterPgEdit() {
+  updateEditorHighlight();
+  state.pgCode = pgEditor.value;
+  save(state);
+  updateCompletion();
+}
+
+// 替换当前选区为 text，光标落到插入文本末尾
+function pgReplaceSelection(text) {
+  const s = pgEditor.selectionStart;
+  pgEditor.value = pgEditor.value.slice(0, s) + text + pgEditor.value.slice(pgEditor.selectionEnd);
+  pgEditor.selectionStart = pgEditor.selectionEnd = s + text.length;
+  afterPgEdit();
+}
+
+// ===================== 词法级代码补全 =====================
+// 候选 = 当前代码里出现过的标识符 + 常用内建（VS Code 的 word-based suggestions 同款；
+// 不是类型感知的 IntelliSense——那个需要挂 tsserver，工程量另算）
+const PG_BUILTINS = [
+  "console", "log", "error", "warn", "Promise", "setTimeout", "setInterval",
+  "JSON", "parse", "stringify", "Object", "Array", "Map", "Set", "Math", "Date",
+  "Number", "String", "Boolean", "isArray", "keys", "values", "entries",
+  "then", "catch", "finally", "async", "await", "function", "const", "let",
+  "return", "new", "for", "of", "if", "else", "true", "false", "undefined",
+  "string", "number", "boolean", "void", "any", "unknown", "interface", "type",
+];
+const pgComplete = document.getElementById("pg-complete");
+let ciItems = [], ciIndex = 0, ciStart = 0;
+
+function currentWord() {
+  const s = pgEditor.selectionStart;
+  const m = pgEditor.value.slice(0, s).match(/[A-Za-z_$][\w$]*$/);
+  return m ? { word: m[0], start: s - m[0].length } : null;
+}
+
+let pgCharWidth = 0;
+function caretXY() {
+  const cs = getComputedStyle(pgEditor);
+  if (!pgCharWidth) {
+    const ctx = document.createElement("canvas").getContext("2d");
+    ctx.font = cs.fontSize + " " + cs.fontFamily;
+    pgCharWidth = ctx.measureText("x").width;  // 等宽字体：列宽恒定
+  }
+  const lh = parseFloat(cs.lineHeight);
+  const before = pgEditor.value.slice(0, pgEditor.selectionStart);
+  const line = (before.match(/\n/g) || []).length;
+  const col = before.length - before.lastIndexOf("\n") - 1;
+  return {
+    x: parseFloat(cs.paddingLeft) + col * pgCharWidth - pgEditor.scrollLeft,
+    y: parseFloat(cs.paddingTop) + (line + 1) * lh - pgEditor.scrollTop,
+  };
+}
+
+// 程序移动光标后（如 Home/End），手动把光标滚进可视区
+function scrollCaretIntoView() {
+  const cs = getComputedStyle(pgEditor);
+  const padL = parseFloat(cs.paddingLeft);
+  const padT = parseFloat(cs.paddingTop);
+  const lh = parseFloat(cs.lineHeight);
+  const { x, y } = caretXY();  // caretXY 返回的是相对可视区的坐标
+  if (x + pgCharWidth > pgEditor.clientWidth) {
+    pgEditor.scrollLeft += x + pgCharWidth - pgEditor.clientWidth + 20;
+  } else if (x < padL) {
+    pgEditor.scrollLeft -= padL - x + 20;
+  }
+  if (y > pgEditor.clientHeight) {
+    pgEditor.scrollTop += y - pgEditor.clientHeight + lh;
+  } else if (y - lh < padT) {
+    pgEditor.scrollTop -= padT - (y - lh);
+  }
+  // 同步高亮层的滚动位置
+  const pre = pgHighlight.parentElement;
+  pre.scrollTop = pgEditor.scrollTop;
+  pre.scrollLeft = pgEditor.scrollLeft;
+}
+
+function updateCompletion() {
+  const w = currentWord();
+  if (!w || w.word.length < 2) return hideCompletion();
+  ciStart = w.start;
+  const ids = new Set(PG_BUILTINS);
+  for (const m of pgEditor.value.matchAll(/[A-Za-z_$][\w$]*/g)) ids.add(m[0]);
+  ciItems = [...ids].filter((x) => x.startsWith(w.word) && x !== w.word).slice(0, 8);
+  if (!ciItems.length) return hideCompletion();
+  ciIndex = 0;
+  renderCompletion();
+}
+
+function renderCompletion() {
+  pgComplete.innerHTML = ciItems.map((t, i) =>
+    `<div class="pg-ci${i === ciIndex ? " active" : ""}" data-i="${i}">${t}</div>`).join("");
+  const { x, y } = caretXY();
+  const wrap = document.getElementById("pg-editor-wrap");
+  pgComplete.style.left = Math.min(x, wrap.clientWidth - 180) + "px";
+  pgComplete.style.top = y + "px";
+  pgComplete.classList.remove("pg-hidden");
+  pgComplete.querySelectorAll(".pg-ci").forEach((el) => {
+    el.onmousedown = (ev) => { ev.preventDefault(); acceptCompletion(+el.dataset.i); };
+  });
+}
+
+function hideCompletion() {
+  pgComplete.classList.add("pg-hidden");
+  ciItems = [];
+}
+
+function acceptCompletion(i) {
+  const item = ciItems[i ?? ciIndex];
+  if (!item) return hideCompletion();
+  pgEditor.setSelectionRange(ciStart, pgEditor.selectionStart);
+  pgReplaceSelection(item);
+  hideCompletion();
+  pgEditor.focus();
+}
+
+pgEditor.addEventListener("input", afterPgEdit);
+pgEditor.addEventListener("click", hideCompletion);
+pgEditor.addEventListener("scroll", () => {
+  const pre = pgHighlight.parentElement;
+  pre.scrollTop = pgEditor.scrollTop;
+  pre.scrollLeft = pgEditor.scrollLeft;
+  hideCompletion();
+});
+
+pgEditor.addEventListener("keydown", (e) => {
+  const completionOpen = !pgComplete.classList.contains("pg-hidden");
+  // 补全下拉打开时优先响应导航键
+  if (completionOpen) {
+    if (e.key === "ArrowDown") { e.preventDefault(); ciIndex = (ciIndex + 1) % ciItems.length; renderCompletion(); return; }
+    if (e.key === "ArrowUp") { e.preventDefault(); ciIndex = (ciIndex - 1 + ciItems.length) % ciItems.length; renderCompletion(); return; }
+    if (e.key === "Tab" || e.key === "Enter") { e.preventDefault(); acceptCompletion(); return; }
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); hideCompletion(); return; }
+  }
+  // Tab：插入两个空格
+  if (e.key === "Tab") {
+    e.preventDefault();
+    pgReplaceSelection("  ");
+    return;
+  }
+  // Enter：自动缩进（继承本行缩进；以 { ( [ 结尾再加一级）。⌘/Ctrl+Enter 留给运行
+  if (e.key === "Enter") {
+    if (e.metaKey || e.ctrlKey) return;
+    e.preventDefault();
+    const v = pgEditor.value, s = pgEditor.selectionStart;
+    const lineText = v.slice(v.lastIndexOf("\n", s - 1) + 1, s);
+    const indent = (lineText.match(/^\s*/) || [""])[0];
+    const before = v[s - 1], after = v[s];
+    const pairs = { "{": "}", "(": ")", "[": "]" };
+    const extra = /[{(\[]\s*$/.test(lineText) ? "  " : "";
+    if (extra && pairs[before] === after) {
+      // 光标在开闭括号之间（如 foo({|})）：展开成三行，光标停在中行
+      pgReplaceSelection("\n" + indent + extra + "\n" + indent);
+      const pos = pgEditor.selectionStart;
+      pgEditor.selectionStart = pgEditor.selectionEnd = pos - indent.length - 1;
+    } else {
+      pgReplaceSelection("\n" + indent + extra);
+    }
+    return;
+  }
+  // }：行首只有空白时自动减一级缩进
+  if (e.key === "}") {
+    const v = pgEditor.value, s = pgEditor.selectionStart;
+    const before = v.slice(v.lastIndexOf("\n", s - 1) + 1, s);
+    if (/^\s+$/.test(before) && before.length >= 2) {
+      e.preventDefault();
+      pgEditor.setSelectionRange(s - 2, s);
+      pgReplaceSelection("}");
+    }
+    return;
+  }
+  // Home/End：行首/行尾（macOS 默认是文档头尾，不符合编辑器习惯）
+  if (e.key === "Home" || e.key === "End") {
+    e.preventDefault();
+    const v = pgEditor.value, s = pgEditor.selectionStart;
+    const ls = v.lastIndexOf("\n", s - 1) + 1;
+    let le = v.indexOf("\n", s);
+    if (le === -1) le = v.length;
+    const target = e.key === "Home" ? ls : le;
+    if (e.shiftKey) {
+      const caretAtEnd = pgEditor.selectionEnd === s;
+      const anchor = caretAtEnd ? pgEditor.selectionStart : pgEditor.selectionEnd;
+      pgEditor.setSelectionRange(Math.min(anchor, target), Math.max(anchor, target));
+    } else {
+      pgEditor.setSelectionRange(target, target);
+    }
+    scrollCaretIntoView();
+    return;
+  }
+});
+
+document.getElementById("pg-fab").onclick = () => {
+  if (pgPanel.classList.contains("pg-hidden")) openPlayground();
+  else closePlayground();
+};
+document.getElementById("pg-run").onclick = runPlayground;
+document.getElementById("pg-close").onclick = closePlayground;
+document.addEventListener("keydown", (e) => {
+  // ⌘/Ctrl+B：切换课程目录
+  if ((e.metaKey || e.ctrlKey) && (e.key === "b" || e.key === "B")) {
+    e.preventDefault();
+    state.navHidden = !state.navHidden;
+    save(state);
+    updateAside();
+    return;
+  }
+  // Ctrl+`：切换 playground
+  if (e.ctrlKey && e.key === "`") {
+    e.preventDefault();
+    if (pgPanel.classList.contains("pg-hidden")) openPlayground();
+    else closePlayground();
+    return;
+  }
+  if (pgPanel.classList.contains("pg-hidden")) return;
+  if (e.key === "Escape") closePlayground();
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); runPlayground(); }
+});
+
+// 给带 data-playground 的代码块加"试一试"按钮
+function enhancePlaygroundBlocks(root) {
+  root.querySelectorAll("pre[data-playground]").forEach((pre) => {
+    if (pre.querySelector(".pg-open-btn")) return;
+    const btn = document.createElement("button");
+    btn.className = "pg-open-btn";
+    btn.textContent = "▶ 试一试";
+    btn.onclick = () => openPlayground(pre.querySelector("code")?.textContent || "");
+    pre.appendChild(btn);
+  });
+}
+
+// 课程内容代码高亮：pair 块按标签识语言，其余默认 typescript，data-lang="text" 跳过
+function highlightLessonCode(root) {
+  root.querySelectorAll("pre code").forEach((codeEl) => {
+    const pre = codeEl.parentElement;
+    let lang = pre.dataset.lang || "typescript";
+    const cell = pre.closest(".cell");
+    if (cell) {
+      const label = cell.querySelector(".lang");
+      if (label && label.classList.contains("py")) lang = "python";
+    }
+    try {
+      codeEl.innerHTML = hljs.highlight(codeEl.textContent, { language: lang }).value;
+      codeEl.classList.add("hljs");
+    } catch { /* 语言不支持则跳过 */ }
+  });
+}
+
+// ===================== 章节测验 =====================
+// 答对全部题目才解锁"标记完成"。题目只考概念本身，不要求读过 pi 源码。
+const QUIZZES = {
+  "ts-s1": [
+    { q: "声明一个不会被重新赋值的变量，应该用？", options: ["let", "var", "const", "function"], answer: 2, explain: "const 锁定绑定；var 是历史遗留，永远不用。" },
+    { q: "import { type X } 里的 type 关键字表示？", options: ["运行时动态导入 X", "只导入类型，运行时不导入", "对 X 强制类型检查", "给 X 起一个别名"], answer: 1, explain: "类型编译后会被擦除，type 让擦除意图更明确。" },
+  ],
+  "ts-s2b": [
+    { q: "“字符串数组”的正确类型标注是？", options: ["string[]", "[string]", "string<>", "Array(string)"], answer: 0, explain: "[string] 是元组（长度固定为 1），不是数组。" },
+    { q: "需要“键为数字、频繁增删、保留键类型”的字典，应该用？", options: ["对象字面量 {}", "Record<string, T>", "number[][]", "Map<number, T>"], answer: 3, explain: "对象的键永远被转成字符串；Map 保留键的原始类型。" },
+    { q: "typeof [] 的结果是？", options: ["\"array\"", "\"object\"", "\"list\"", "\"undefined\""], answer: 1, explain: "判断数组必须用 Array.isArray。" },
+  ],
+  "ts-s2": [
+    { q: "TS 判断一个对象“是不是 UserMessage”的依据是？", options: ["它的类名和继承链", "它是否拥有该 interface 声明的字段", "instanceof 检查的结果", "它的构造函数名"], answer: 1, explain: "结构类型：形状吻合即是，与出身无关。" },
+    { q: "interface 编译成 JS 之后会？", options: ["变成一个 class", "变成 JSON schema", "完全消失，不产生运行时代码", "变成注释保留下来"], answer: 2, explain: "类型只是编译期契约，运行时一行不剩。" },
+    { q: "LLM 返回的 JSON 为什么不能只靠 interface 保证正确？", options: ["interface 不支持 JSON", "interface 只作用于编译期，运行时数据需要校验代码", "JSON 的字段太多写不下", "TS 不认识 LLM 的字段"], answer: 1, explain: "类型管内部，schema 管边界。" },
+  ],
+  "ts-s9": [
+    { q: "const { model: current } = config 的效果是？", options: ["给 config 添加 current 字段", "把 config.current 取到 model", "把 config.model 取到变量 current", "重命名 config 对象本身"], answer: 2, explain: "冒号是重命名：字段名 : 新变量名。" },
+    { q: "JS 模拟关键字参数（kwargs）的标准做法是？", options: ["参数处解构一个 options 对象", "使用 arguments 对象", "按位置传一个数组", "JS 做不到这一点"], answer: 0 },
+    { q: "const { a } = maybeObj，当 maybeObj 为 undefined 时会？", options: ["a 是 undefined", "a 是 null", "返回一个空对象", "抛出 TypeError"], answer: 3, explain: "防御写法：const { a } = maybeObj ?? {}。" },
+  ],
+  "ts-s10": [
+    { q: "a ?? b 什么时候取 b？", options: ["a 是任何假值时", "仅当 a 是 null 或 undefined", "a 是空字符串时", "a 等于 0 时"], answer: 1 },
+    { q: "给“可能是 0 的音量值”设默认值，为什么用 ?? 而不是 ||？", options: ["?? 计算速度更快", "|| 会把 0 当假值而错用默认值", "|| 不能用于数字", "?? 会自动四舍五入"], answer: 1, explain: "0、空字符串对 ?? 都是有效值。" },
+  ],
+  "ts-s6": [
+    { q: "(x) => x * 2 最贴切的理解是？", options: ["匿名函数，可以直接当值传递", "一个类型声明", "一个编译器宏", "一个 class 实例"], answer: 0 },
+    { q: "“函数是一等公民”意味着函数可以？", options: ["被编译器自动并行", "拥有独立的类型系统", "赋值、传参、返回、存储、匿名创建", "只能作为对象方法存在"], answer: 2 },
+  ],
+  "ts-s5": [
+    { q: "要拿“第一个满足条件的元素”，应该用？", options: ["some", "filter", "map", "find"], answer: 3 },
+    { q: "[].every(f) 的返回值是？", options: ["true", "false", "undefined", "抛出异常"], answer: 0, explain: "空真（vacuous truth），所以 every 前常要先检查 length > 0。" },
+    { q: "find 找不到元素时返回？", options: ["null", "-1", "undefined", "抛出异常"], answer: 2, explain: "findIndex 找不到才是 -1，别混。" },
+  ],
+  "ts-s5b": [
+    { q: "要遍历数组的元素值，应该用？", options: ["for...in", "for...of", "递归遍历", "只有 forEach"], answer: 1 },
+    { q: "for...in 遍历数组时得到的是？", options: ["元素的值", "元素的个数", "字符串形式的索引", "迭代器对象"], answer: 2, explain: "for...in 遍历的是键（字符串索引），这是 JS 经典陷阱。" },
+    { q: "批量任务要“逐个执行、保证顺序”，应该用？", options: ["Promise.all", "forEach + async", "for...of 里 await", "map + await"], answer: 2 },
+  ],
+  "ts-s3": [
+    { q: "type StopReason = \"stop\" | \"length\" 表示？", options: ["继承两个类型", "数组有两个元素", "两个可选字段", "取值只能是这两个字符串之一"], answer: 3 },
+    { q: "判别联合靠什么区分各个成员？", options: ["一个共有的字面量标签字段", "成员的字段数量", "成员的 class 名", "成员的声明顺序"], answer: 0 },
+  ],
+  "ts-s4": [
+    { q: "处理判别联合的惯用方式是？", options: ["逐个试字段是否存在", "全部 as 成目标类型", "switch 检查标签字段，分支内类型自动收窄", "用 typeof 判断 object"], answer: 2 },
+    { q: "收窄带来的保证是？", options: ["运行速度更快", "编译器保证分支内访问的字段存在", "减少内存占用", "自动生成测试"], answer: 1 },
+  ],
+  "ts-s7": [
+    { q: "first<T>(items: T[]): T | undefined 里 T 的作用是？", options: ["限制只能传一种数组", "运行时检查元素类型", "把输入元素类型和返回类型关联起来", "给函数结果加缓存"], answer: 2 },
+    { q: "ToolResultMessage<TDetails = any> 里的 = any 是？", options: ["泛型参数的默认值", "给字段赋值 any", "一个类型断言", "一个联合类型"], answer: 0 },
+    { q: "什么时候选泛型插槽而不是判别联合？", options: ["变体能全部枚举时", "形状有公共骨架但变体无法枚举时", "字段很少的时候", "性能敏感的时候"], answer: 1 },
+  ],
+  "ts-s11": [
+    { q: "x as T 做了什么？", options: ["运行时把 x 转换成 T", "校验 x 是否符合 T", "让编译器相信你，不做运行时检查", "对 x 做深拷贝"], answer: 2, explain: "as 只是你打的包票，数据本身不变。" },
+    { q: "网络 JSON 进入系统的正确姿势是？", options: ["直接 as 成内部类型", "先加 interface 声明", "先运行时校验，再当内部类型用", "JSON.parse 会自动校验"], answer: 2 },
+  ],
+  "ts-s12": [
+    { q: "content.filter((c) => c.type === \"toolCall\") 返回？", options: ["第一个 toolCall 元素", "所有 type 为 toolCall 的元素组成的新数组", "原数组本身", "一个布尔值"], answer: 1 },
+    { q: "某函数类型是 (e) => Promise<void> | void，为什么这样设计？", options: ["是笔误", "调用方都会 await，两种实现都能正常工作", "void 运行更快", "Promise 是可选的"], answer: 1, explain: "await 一个非 Promise 值也是合法的。" },
+    { q: "const next = { ...config, model: \"gpt-5\" } 之后，config 变了吗？", options: ["变了，model 被覆盖", "没变，得到的是一个新对象", "只改变了第一层", "取决于是否 const"], answer: 1, explain: "展开是浅拷贝 + 覆盖，原对象不动。" },
+  ],
+  "ts-a1": [
+    { q: "setTimeout(fn, 1000) 调用后，程序会？", options: ["阻塞 1 秒再执行 fn", "立即执行 fn", "暂停整个页面 1 秒", "立即返回继续执行，fn 到点才被调用"], answer: 3, explain: "登记 → 继续 → 回头执行。" },
+    { q: "console A → setTimeout(B) → console C，输出顺序是？", options: ["A B C", "A C B", "C A B", "B A C"], answer: 1, explain: "回调被登记后延迟执行，不打断后续同步代码。" },
+    { q: "await sleep(500) 这行做了什么？", options: ["让 CPU 空转 500ms", "创建新线程去等待", "暂停当前 async 函数，期间线程可以干别的", "立即跳到函数末尾"], answer: 2 },
+    { q: "await 只能写在哪里？", options: ["任何函数里", "对象字面量里", "任何循环里", "async 函数里"], answer: 3 },
+  ],
+  "ts-s8": [
+    { q: "已 fulfilled 的 Promise 再 await 一次会？", options: ["重新执行 executor", "立即拿到缓存的结果", "变回 pending", "抛出异常"], answer: 1, explain: "状态只迁移一次，结果被缓存。" },
+    { q: "new Promise((r) => ...) 里的 r 是？", options: ["一个全局定时器 id", "Promise 的返回值", "构造器传进来的 resolve 函数", "一个事件对象"], answer: 2, explain: "调用 r(值) 把 Promise 变成 fulfilled。" },
+    { q: "rejected 的 Promise 被 await 时会？", options: ["返回 undefined", "静默吞掉错误", "返回错误对象", "在 await 处抛出异常，可用 try/catch 接"], answer: 3 },
+    { q: "两个独立任务想并发完成，正确做法是？", options: ["await 一个再 await 另一个", "两个都先创建出来，再 Promise.all", "forEach 里逐个 await", "写进两个文件"], answer: 1, explain: "Promise 创建即执行；先都创建再一起等。" },
+  ],
+  "ts-s7b": [
+    { q: "事件循环什么时候切换任务？", options: ["固定每 10ms 切换", "任何语句之间都可能", "任务跑到 await 主动让出时", "函数声明的时候"], answer: 2, explain: "协作式调度：调度员只在 await 点接手。" },
+    { q: "一个 10 秒的纯计算 while 循环会让页面？", options: ["自动分片执行", "后台继续响应", "冻结，其他任务全部饿死", "只是变慢一点"], answer: 2, explain: "没人让出控制权，整个事件循环被占死。" },
+    { q: "调用生成器函数 function* f() {} 会？", options: ["立即跑完整个函数体", "自动在中途暂停", "返回一个 Promise", "不执行函数体，返回一个待驱动对象"], answer: 3 },
+    { q: "两个 await 之间的同步代码会被别的任务插入吗？", options: ["不会，协作式调度只在 await 点切换", "会，随时都可能", "只有定时器能插入", "取决于浏览器"], answer: 0, explain: "这就是异步代码不需要锁的原因。" },
+  ],
+  "ts-s8b": [
+    { q: "async function* 相比 function* 多出什么能力？", options: ["自动并行产出", "yield 之间可以 await，产出可以等 I/O", "可以 return 两次", "产出速度更快"], answer: 1 },
+    { q: "流式响应的总时间为什么无法靠异步压缩？", options: ["Promise 的数量限制", "chunk 有内在顺序，后面的依赖前面的", "网络带宽是固定的", "语法不允许"], answer: 1, explain: "流式的收益在边到边用和不阻塞，不在总时间。" },
+    { q: "[1,2,3].forEach(async (x) => await task(x)) 的问题是？", options: ["语法错误", "任务自动串行执行", "立即返回，任务并发飞出没人等", "必定内存泄漏"], answer: 2 },
+  ],
+  "l1-s2": [
+    { q: "agent 核心循环与 UI 之间推荐的耦合方式是？", options: ["UI 直接调核心的内部函数", "核心只发事件，UI 订阅事件流", "核心直接操作界面元素", "共享几个全局变量"], answer: 1, explain: "事件解耦让同一核心能接 TUI、Electron、测试三种消费者。" },
+    { q: "模型输出被 token 上限截断时，其中的 tool call 应如何处理？", options: ["尽量执行能解析的", "静默忽略掉", "全部标记为错误不执行，反馈给模型重发", "让用户手动挑选"], answer: 2, explain: "截断的参数可能看起来合法但缺字段，执行风险大。" },
+    { q: "工具执行出错（比如工具不存在）应该怎么处理？", options: ["抛异常终止整个 agent", "把错误转成 toolResult 喂回模型，让它自己纠正", "弹窗打断用户", "静默重试三次"], answer: 1, explain: "错误反馈给模型是 agent 自愈的关键。" },
+  ],
+};
+
+function buildQuizCard(secId, questions) {
+  const card = document.createElement("div");
+  card.className = "quiz";
+  card.innerHTML = `<div class="quiz-title">✎ 检验一下 · 答对全部 ${questions.length} 题才能标记完成</div>`;
+  questions.forEach((q, qi) => {
+    const qd = document.createElement("div");
+    qd.className = "quiz-q";
+    qd.innerHTML = `<div class="q-text">${qi + 1}. ${q.q}</div>` +
+      q.options.map((o, oi) =>
+        `<label class="quiz-opt"><input type="radio" name="q-${secId}-${qi}" value="${oi}"><span>${o}</span></label>`
+      ).join("") +
+      `<div class="quiz-explain" hidden></div>`;
+    card.appendChild(qd);
+  });
+  const actions = document.createElement("div");
+  actions.className = "quiz-actions";
+  actions.innerHTML = `<button class="quiz-submit">提交答案</button><span class="quiz-status"></span>`;
+  card.appendChild(actions);
+
+  const statusEl = actions.querySelector(".quiz-status");
+  if (state.quiz && state.quiz[secId]) {
+    statusEl.className = "quiz-status pass";
+    statusEl.textContent = "已通过 ✓（可以重练）";
+  }
+  actions.querySelector(".quiz-submit").onclick = () => {
+    let allAnswered = true, allCorrect = true;
+    const qds = card.querySelectorAll(".quiz-q");
+    questions.forEach((q, qi) => {
+      const qd = qds[qi];
+      const sel = qd.querySelector(`input[name="q-${secId}-${qi}"]:checked`);
+      const optEls = qd.querySelectorAll(".quiz-opt");
+      optEls.forEach((el) => el.classList.remove("correct", "wrong"));
+      if (!sel) { allAnswered = false; return; }
+      const chosen = +sel.value;
+      if (chosen === q.answer) {
+        optEls[chosen].classList.add("correct");
+      } else {
+        optEls[chosen].classList.add("wrong");
+        optEls[q.answer].classList.add("correct");
+        allCorrect = false;
+      }
+      if (q.explain) {
+        const ex = qd.querySelector(".quiz-explain");
+        ex.hidden = false;
+        ex.textContent = "💡 " + q.explain;
+      }
+    });
+    if (!allAnswered) {
+      statusEl.className = "quiz-status fail";
+      statusEl.textContent = "还有题目没作答";
+      return;
+    }
+    if (allCorrect) {
+      state.quiz = state.quiz || {};
+      state.quiz[secId] = true;
+      save(state);
+      statusEl.className = "quiz-status pass";
+      statusEl.textContent = "全部答对，章节可以标记完成了 ✓";
+      const btn = document.querySelector(`.done-btn[data-section="${secId}"]`);
+      if (btn && !state.sections[secId]) {
+        btn.disabled = false;
+        btn.textContent = "标记完成";
+      }
+    } else {
+      statusEl.className = "quiz-status fail";
+      statusEl.textContent = "有答错的，看解析后再试一次";
+    }
+  };
+  return card;
+}
+
+function renderQuizzes(main) {
+  main.querySelectorAll(".article h3[id]").forEach((h) => {
+    const questions = QUIZZES[h.id];
+    if (!questions) return;
+    // 找本节的尾部（第一个 .section-tail 兄弟）
+    let node = h.nextElementSibling;
+    while (node && node.tagName !== "H3" && !node.classList.contains("section-tail")) {
+      node = node.nextElementSibling;
+    }
+    if (node && node.classList.contains("section-tail")) {
+      node.before(buildQuizCard(h.id, questions));
+    }
+  });
+}
+
+// ===================== Hash 路由 =====================
+// 格式：#lesson-id/section-id，刷新后恢复课程和滚动位置
+function parseHash() {
+  const m = location.hash.match(/^#([^/]+)(?:\/(.+))?$/);
+  return m ? { lesson: m[1], section: m[2] } : null;
+}
+
+function applyHash() {
+  const h = parseHash();
+  if (!h) return;
+  const lesson = LESSONS.find(l => l.id === h.lesson && !l.locked);
+  if (!lesson) return;
+  currentLesson = lesson.id;
+  state.currentLesson = lesson.id;
+  save(state);
+  render();
+  requestAnimationFrame(() => {
+    if (h.section) {
+      document.getElementById(h.section)?.scrollIntoView({ block: "start" });
+    } else {
+      window.scrollTo(0, 0);
+    }
+  });
+}
+
+// 滚动时自动同步 hash（scroll spy）
+let spyTicking = false;
+window.addEventListener("scroll", () => {
+  if (spyTicking) return;
+  spyTicking = true;
+  requestAnimationFrame(() => {
+    spyTicking = false;
+    const heads = [...document.querySelectorAll(".article h3[id]")];
+    let active = null;
+    for (const h of heads) {
+      if (h.getBoundingClientRect().top <= 120) active = h;
+      else break;
+    }
+    const newHash = "#" + currentLesson + (active ? "/" + active.id : "");
+    if (location.hash !== newHash) history.replaceState(null, "", newHash);
+  });
+});
+window.addEventListener("hashchange", applyHash);
+
+// 恢复上次的 playground 面板状态
+if (state.pgOpen) openPlayground();
+
+// 有 hash 则定位（覆盖 localStorage 的 currentLesson）
+if (location.hash) applyHash();
+
+function render() { renderNav(); renderContent(); renderProgress(); }
+render();
+</script>
+</body>
+</html>
