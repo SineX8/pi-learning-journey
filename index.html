@@ -410,6 +410,16 @@
     /* Playground 编辑器与高亮层同步放大，保证字体度量一致 */
     #pg-editor-wrap pre, #pg-editor { font-size: 14px; }
     footer { font-size: 13px; }
+
+    /* ---- 手机端防溢出：长标识符/URL/路径断行，代码块与表格不撑破视口 ---- */
+    body { overflow-x: hidden; }
+    main { min-width: 0; }
+    .article { overflow-wrap: break-word; word-break: break-word; }
+    .file-ref { max-width: 100%; overflow-wrap: break-word; word-break: break-word; }
+    code { overflow-wrap: break-word; }
+    pre { max-width: 100%; }
+    table { display: block; overflow-x: auto; }
+    th, td { overflow-wrap: break-word; word-break: break-word; }
   }
   @media (max-width: 1200px) {
     .toc { display: none; }
