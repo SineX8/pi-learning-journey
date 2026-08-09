@@ -346,9 +346,34 @@
   .article a { color: var(--accent); text-decoration: none; }
   .article a:hover { text-decoration: underline; }
 
+  #nav-backdrop { display: none; }
   @media (max-width: 860px) {
-    aside { display: none; }
+    /* 手机端：侧边栏改为抽屉式浮层，默认收起，点击展开按钮滑出 */
+    aside {
+      position: fixed; left: 0; top: 0; z-index: 90;
+      width: min(300px, 85vw); height: 100vh; height: 100dvh;
+      transform: translateX(-105%);
+      transition: transform .25s ease;
+      box-shadow: 8px 0 24px rgba(0,0,0,.5);
+    }
+    aside.collapsed { display: block; }
+    aside.mobile-open { transform: none; }
     main { padding: 24px 20px 80px; }
+    /* 展开按钮在手机端始终可见，作为打开抽屉的入口 */
+    #nav-show {
+      top: 12px; transform: none;
+      width: 36px; height: 36px; font-size: 18px;
+    }
+    #nav-show:hover { width: 36px; }
+    #nav-show.hidden { display: flex; }
+    #nav-backdrop {
+      display: block;
+      position: fixed; inset: 0; z-index: 85;
+      background: rgba(0,0,0,.5);
+      opacity: 0; pointer-events: none;
+      transition: opacity .25s;
+    }
+    #nav-backdrop.show { opacity: 1; pointer-events: auto; }
   }
   @media (max-width: 1200px) {
     .toc { display: none; }
@@ -371,6 +396,8 @@
     </div>
     <nav id="nav"></nav>
   </aside>
+
+  <div id="nav-backdrop"></div>
 
   <main id="content"></main>
 
@@ -1979,6 +2006,7 @@ function renderNav() {
       history.replaceState(null, "", "#" + lesson.id);
       render();
       window.scrollTo(0, 0);
+      if (mobileMq.matches) setMobileDrawer(false);
     };
     nav.appendChild(el);
   }
@@ -2163,6 +2191,13 @@ function closePlayground() {
   save(state);
 }
 
+// 手机端抽屉开关（桌面端无效果）
+const mobileMq = window.matchMedia("(max-width: 860px)");
+function setMobileDrawer(open) {
+  document.querySelector("aside").classList.toggle("mobile-open", open);
+  document.getElementById("nav-backdrop").classList.toggle("show", open);
+}
+
 // 侧边栏收起条件：手动隐藏 或 playground 打开
 function updateAside() {
   const pgOpen = !pgPanel.classList.contains("pg-hidden");
@@ -2171,15 +2206,22 @@ function updateAside() {
 }
 
 document.getElementById("nav-hide").onclick = () => {
+  if (mobileMq.matches) { setMobileDrawer(false); return; }
   state.navHidden = true;
   save(state);
   updateAside();
 };
 document.getElementById("nav-show").onclick = () => {
+  if (mobileMq.matches) {
+    const aside = document.querySelector("aside");
+    setMobileDrawer(!aside.classList.contains("mobile-open"));
+    return;
+  }
   state.navHidden = false;
   save(state);
   updateAside();
 };
+document.getElementById("nav-backdrop").onclick = () => setMobileDrawer(false);
 updateAside();
 
 function fmtVal(v) {
@@ -2425,6 +2467,11 @@ document.addEventListener("keydown", (e) => {
   // ⌘/Ctrl+B：切换课程目录
   if ((e.metaKey || e.ctrlKey) && (e.key === "b" || e.key === "B")) {
     e.preventDefault();
+    if (mobileMq.matches) {
+      const aside = document.querySelector("aside");
+      setMobileDrawer(!aside.classList.contains("mobile-open"));
+      return;
+    }
     state.navHidden = !state.navHidden;
     save(state);
     updateAside();
