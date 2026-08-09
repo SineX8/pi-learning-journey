@@ -374,6 +374,42 @@
       transition: opacity .25s;
     }
     #nav-backdrop.show { opacity: 1; pointer-events: auto; }
+
+    /* ---- 手机端可读性 ---- */
+    body { font-size: 17px; line-height: 1.8; }
+    p { margin: 14px 0; }
+    ul, ol { margin: 14px 0 14px 22px; }
+    li { margin: 10px 0; }
+    .lesson-header { margin-bottom: 40px; }
+    .lesson-tag { font-size: 13px; }
+    .lesson-header h2 { font-size: 26px; margin: 10px 0 12px; }
+    .lesson-header .meta { font-size: 14px; }
+    h3 { font-size: 22px; margin: 48px 0 18px; padding-top: 28px; }
+    h4 { font-size: 18px; margin: 32px 0 12px; }
+    code { font-size: 15px; }
+    pre { font-size: 14px; line-height: 1.75; padding: 18px 20px; border-radius: 10px; }
+    .pre-wrap { margin: 18px 0; }
+    .file-ref { font-size: 13px; }
+    .callout { font-size: 15.5px; padding: 14px 18px; margin: 20px 0; }
+    table { font-size: 15px; margin: 18px 0; }
+    th, td { padding: 10px 12px; }
+    th { font-size: 14px; }
+    td { font-size: 14.5px; }
+    /* 抽屉内导航项：字号更大、点击区域更大 */
+    .nav-item { padding: 14px 20px; }
+    .nav-item .nav-title { font-size: 15.5px; }
+    .nav-item .nav-sub { font-size: 13px; margin-top: 4px; }
+    /* 测验 / 作业 / 按钮随正文放大 */
+    .quiz { padding: 18px 22px; }
+    .quiz-q .q-text { font-size: 15px; }
+    .quiz-opt { font-size: 14.5px; padding: 8px 12px; }
+    .quiz-explain { font-size: 13.5px; }
+    .quiz-submit { font-size: 14px; padding: 8px 18px; }
+    .section-tail .done-btn { font-size: 15px; padding: 13px; }
+    .sec-status { font-size: 16px; }
+    /* Playground 编辑器与高亮层同步放大，保证字体度量一致 */
+    #pg-editor-wrap pre, #pg-editor { font-size: 14px; }
+    footer { font-size: 13px; }
   }
   @media (max-width: 1200px) {
     .toc { display: none; }
