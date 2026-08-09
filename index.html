@@ -103,6 +103,9 @@
     margin: 0;
     font-size: 13px;
     line-height: 1.65;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
   }
   pre code { background: none; padding: 0; color: var(--text); }
   .pre-wrap { margin: 14px 0; }
@@ -285,7 +288,7 @@
   #pg-editor-wrap pre, #pg-editor {
     margin: 0; font-family: "SF Mono", Menlo, Consolas, monospace;
     font-size: 13px; line-height: 1.65; padding: 14px 16px;
-    tab-size: 2; white-space: pre; overflow: auto;
+    tab-size: 2; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; overflow: auto;
   }
   #pg-editor-wrap pre {
     position: absolute; inset: 0; pointer-events: none;
