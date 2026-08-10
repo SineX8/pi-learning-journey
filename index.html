@@ -162,6 +162,37 @@
   .section-tail .done-btn:disabled { opacity: .45; cursor: not-allowed; }
   .section-tail .done-btn:disabled:hover { border-color: var(--text-dim); color: var(--text-dim); border-style: dashed; }
 
+  /* ---- 事件循环可视化 ---- */
+  .evl { border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin: 16px 0; background: var(--bg-soft); }
+  .evl-note {
+    font-size: 13.5px; padding: 10px 14px; border-radius: 8px; margin-bottom: 12px;
+    background: rgba(88,166,255,.1); border-left: 3px solid var(--accent); min-height: 22px;
+  }
+  .evl-note .evl-step-no { color: var(--accent); font-weight: 700; margin-right: 8px; }
+  .evl-controls { display: flex; gap: 8px; margin-bottom: 12px; }
+  .evl-controls button {
+    background: var(--bg-code); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; font-size: 12.5px; font-family: inherit; padding: 5px 14px; cursor: pointer;
+  }
+  .evl-controls button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .evl-controls button:disabled { opacity: .4; cursor: not-allowed; }
+  .evl-grid { display: grid; grid-template-columns: 1fr 1.4fr 1.2fr; gap: 10px; }
+  .evl-panel { border: 1px solid var(--border); border-radius: 8px; min-height: 130px; display: flex; flex-direction: column; }
+  .evl-panel-title { font-size: 11px; letter-spacing: 1px; color: var(--text-dim); padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  .evl-items { flex: 1; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .evl-items.stack { flex-direction: column-reverse; }
+  .evl-item {
+    font-family: "SF Mono", Menlo, monospace; font-size: 12px;
+    padding: 4px 10px; border-radius: 6px; animation: evl-in .25s;
+  }
+  @keyframes evl-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+  .evl-item.st { background: rgba(88,166,255,.15); border: 1px solid var(--accent); }
+  .evl-item.mi { background: rgba(210,168,255,.12); border: 1px solid var(--accent2); }
+  .evl-item.ma { background: rgba(210,153,34,.12); border: 1px solid var(--orange); }
+  .evl-empty { color: var(--border); font-size: 12px; text-align: center; padding: 12px 0; }
+  .evl-log-title { font-size: 11px; letter-spacing: 1px; color: var(--text-dim); margin-top: 10px; }
+  .evl-log { margin-top: 6px; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; min-height: 40px; font-family: "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--green); white-space: pre-wrap; }
+
   /* ---- 章节测验 ---- */
   .quiz {
     border: 1px solid var(--border); border-radius: 10px;
@@ -427,7 +458,77 @@
   @media (max-width: 1200px) {
     .toc { display: none; }
   }
-</style>
+
+  /* ---- for await 执行时序图（纯 HTML/CSS，固定内宽 + 横向滚动，窄屏不溢出） ---- */
+  .tl-scroll {
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    margin: 18px 0; border: 1px solid var(--border); border-radius: 10px;
+    background: var(--bg-soft);
+  }
+  .tl { min-width: 780px; padding: 20px 22px 16px; font-size: 14px; }
+  .tl-ruler {
+    position: relative; height: 24px; margin-left: 96px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tl-tick {
+    position: absolute; bottom: 5px; left: var(--x); transform: translateX(-50%);
+    font-size: 12px; color: var(--text-dim); white-space: nowrap;
+  }
+  .tl-tick::after {
+    content: ""; position: absolute; left: 50%; bottom: -6px;
+    width: 1px; height: 6px; background: var(--border);
+  }
+  .tl-tick.first { transform: none; }
+  .tl-tick.last { transform: translateX(-100%); }
+  .tl-lane { display: flex; margin-top: 16px; }
+  .tl-lane-label {
+    width: 96px; flex: none; display: flex; align-items: center;
+    font-size: 13px; line-height: 1.4; color: var(--text-dim); padding-right: 12px;
+  }
+  .tl-track { position: relative; flex: 1; height: 78px; }
+  .tl-line {
+    position: absolute; left: 0; right: 0; top: 50%; height: 2px;
+    transform: translateY(-50%); border-radius: 1px;
+  }
+  .tl-lane.blue .tl-line { background: rgba(88,166,255,.35); }
+  .tl-lane.green .tl-line { background: rgba(63,185,80,.35); }
+  .tl-wait {
+    position: absolute; top: 50%; height: 12px; transform: translateY(-50%);
+    border-radius: 6px;
+  }
+  .tl-lane.blue .tl-wait { background: rgba(88,166,255,.07); border: 1px dashed rgba(88,166,255,.3); }
+  .tl-lane.green .tl-wait { background: rgba(63,185,80,.07); border: 1px dashed rgba(63,185,80,.3); }
+  .tl-ev {
+    position: absolute; top: 50%; left: var(--x);
+    width: 12px; height: 12px; border-radius: 50%;
+    transform: translate(-50%,-50%);
+  }
+  .tl-lane.blue .tl-ev { background: var(--accent); box-shadow: 0 0 0 3px rgba(88,166,255,.18); }
+  .tl-lane.green .tl-ev { background: var(--green); box-shadow: 0 0 0 3px rgba(63,185,80,.18); }
+  .tl-ev-label {
+    position: absolute; bottom: 17px; left: 50%; transform: translateX(-50%);
+    white-space: nowrap; font-size: 13px; padding: 2px 8px; border-radius: 6px;
+    background: var(--bg); border: 1px solid;
+  }
+  .tl-lane.blue .tl-ev-label { border-color: rgba(88,166,255,.5); color: var(--accent); }
+  .tl-lane.green .tl-ev-label { border-color: rgba(63,185,80,.5); color: var(--green); }
+  .tl-ev-label.end { left: auto; right: -6px; transform: none; }
+  .tl-yield {
+    position: absolute; top: 50%; left: var(--x);
+    width: 7px; height: 7px; border-radius: 50%;
+    border: 2px solid var(--orange); background: var(--bg);
+    transform: translate(-50%,-50%);
+  }
+  .tl-track-note {
+    position: absolute; top: calc(50% + 13px); left: var(--x);
+    transform: translateX(-50%); white-space: nowrap;
+    font-size: 12px; color: var(--text-dim);
+  }
+  .tl-legend { font-size: 14px; color: var(--text-dim); line-height: 1.75; margin: 4px 0 8px; }
+  .tl-legend li { margin: 6px 0; }
+  .tl-legend .b { color: var(--accent); }
+  .tl-legend .g { color: var(--green); }
+  .tl-legend .o { color: var(--orange); }
 </head>
 <body>
 <div class="layout">
@@ -1730,6 +1831,27 @@ try {
   <tr><td>JS Web Worker / Node worker_threads</td><td>✓</td><td><strong>✓</strong></td><td>OS 调度</td></tr>
 </table>
 
+<h4>可视化：两个 async 函数的事件循环现场（单步演示）</h4>
+<p>这段代码有两个 async 函数同时活跃——一个等定时器（宏任务），一个等已完成的 Promise（微任务）。用下面的单步器一格一格走，<strong>看清 await 暂停时到底在干什么：函数挂起、续体进队列、线程去跑别的、落定后恢复</strong>：</p>
+<div class="pre-wrap"><pre><code>async function download() {          // 任务 A
+  console.log("A: 开始下载");
+  await sleep(500);                  // 挂起；注册 500ms 定时器（宏任务）
+  console.log("A: 下载完成");         // ← 续体
+}
+async function parse() {             // 任务 B
+  console.log("B: 开始解析");
+  await Promise.resolve();           // 挂起；Promise 已完成，续体直接进微任务队列
+  console.log("B: 解析完成");         // ← 续体
+}
+download();
+parse();
+console.log("C: 同步代码结束");</code></pre></div>
+<div id="evl-viz"></div>
+<div class="callout key">
+  <strong>走完回答三个问题：</strong>① 为什么 C 在两个函数完成之前打印？② 为什么 B 的完成排在 A 前面（微任务 vs 宏任务的优先级）？
+  ③ await 那一刻，这个函数到底处于什么状态？（答：函数被冻结在 await 点，剩余部分作为续体排在队列里，线程已经不属于它了。）
+</div>
+
 <h4>③ 交错执行的证据：心跳实验</h4>
 <p>"事件循环在等待时去跑别的任务"——别停留在字面上，跑这个实验亲眼看：</p>
 <div class="pre-wrap"><pre data-playground><code>const t0 = Date.now();
@@ -1880,6 +2002,68 @@ console.log("[" + el() + "] 最终: " + text);
 // 输出里心跳（200ms）和 chunk（300ms）交错出现——
 // 流式的总耗时仍是 1.2s，但心跳的工作被"免费"塞进了流式的等待空档里。
 // 这就是"不阻塞"的含义：总时间没变，等待时间不再浪费。</code></pre></div>
+
+<h4>执行时序图：心跳如何插进 chunk 的等待空档</h4>
+<p>把上面代码的 1.2 秒画成时间轴——两个任务在同一个事件循环上的真实交错顺序（窄屏可左右滑动）：</p>
+<div class="tl-scroll">
+  <div class="tl">
+    <div class="tl-ruler">
+      <span class="tl-tick first" style="--x:0%">0</span>
+      <span class="tl-tick" style="--x:16.67%">200</span>
+      <span class="tl-tick" style="--x:33.33%">400</span>
+      <span class="tl-tick" style="--x:50%">600</span>
+      <span class="tl-tick" style="--x:66.67%">800</span>
+      <span class="tl-tick" style="--x:83.33%">1000</span>
+      <span class="tl-tick last" style="--x:100%">1200ms</span>
+    </div>
+    <div class="tl-lane blue">
+      <div class="tl-lane-label">for await<br>消费 fakeLlmStream</div>
+      <div class="tl-track">
+        <div class="tl-line"></div>
+        <div class="tl-wait" style="left:0%;width:25%"></div>
+        <div class="tl-wait" style="left:25%;width:25%"></div>
+        <div class="tl-wait" style="left:50%;width:25%"></div>
+        <div class="tl-wait" style="left:75%;width:25%"></div>
+        <span class="tl-yield" style="--x:0%"></span>
+        <span class="tl-yield" style="--x:calc(25% + 10px)"></span>
+        <span class="tl-yield" style="--x:calc(50% + 10px)"></span>
+        <span class="tl-yield" style="--x:calc(75% + 10px)"></span>
+        <div class="tl-ev" style="--x:25%"><span class="tl-ev-label">300ms 收到"你好"</span></div>
+        <div class="tl-ev" style="--x:50%"><span class="tl-ev-label">600ms 收到"，我是"（先）</span></div>
+        <div class="tl-ev" style="--x:75%"><span class="tl-ev-label">900ms 收到" pi"</span></div>
+        <div class="tl-ev" style="--x:100%"><span class="tl-ev-label end">1200ms 收到"。"→ 最终输出</span></div>
+        <span class="tl-track-note" style="--x:37.5%">空档里 await 挂起，线程还给事件循环</span>
+      </div>
+    </div>
+    <div class="tl-lane green">
+      <div class="tl-lane-label">ticker<br>心跳任务</div>
+      <div class="tl-track">
+        <div class="tl-line"></div>
+        <div class="tl-wait" style="left:0%;width:16.67%"></div>
+        <div class="tl-wait" style="left:16.67%;width:16.66%"></div>
+        <div class="tl-wait" style="left:33.33%;width:16.67%"></div>
+        <div class="tl-wait" style="left:50%;width:16.67%"></div>
+        <div class="tl-wait" style="left:66.67%;width:16.66%"></div>
+        <span class="tl-yield" style="--x:0%"></span>
+        <span class="tl-yield" style="--x:calc(16.67% + 10px)"></span>
+        <span class="tl-yield" style="--x:calc(33.33% + 10px)"></span>
+        <span class="tl-yield" style="--x:calc(50% + 10px)"></span>
+        <span class="tl-yield" style="--x:calc(66.67% + 10px)"></span>
+        <div class="tl-ev" style="--x:16.67%"><span class="tl-ev-label">200ms 心跳1</span></div>
+        <div class="tl-ev" style="--x:33.33%"><span class="tl-ev-label">400ms 心跳2</span></div>
+        <div class="tl-ev" style="--x:50%"><span class="tl-ev-label">600ms 心跳3（同刻·后）</span></div>
+        <div class="tl-ev" style="--x:66.67%"><span class="tl-ev-label">800ms 心跳4</span></div>
+        <div class="tl-ev" style="--x:83.33%"><span class="tl-ev-label">1000ms 心跳5</span></div>
+        <span class="tl-track-note" style="--x:25%">心跳的 200ms 定时器在 chunk 的空档里到点</span>
+      </div>
+    </div>
+  </div>
+</div>
+<ul class="tl-legend">
+  <li><span class="b">●</span> 蓝道 = for await 消费流：每 300ms 到货一个 chunk，总耗时 1200ms 不可压缩；<span class="g">●</span> 绿道 = ticker：每 200ms 一次心跳。<span class="o">○</span> 空心点 = await 让出控制权、等定时器到点。</li>
+  <li>t≈600ms 两个定时器同刻到期：chunk 定时器先登记先执行，所以先"收到，我是"再"心跳3"。总耗时仍是 1200ms，但心跳的 5 次工作被"免费"塞进了 chunk 的等待空档。</li>
+  <li><strong>能插队的前提：两个任务都是 async 函数，await 会挂起自己、把线程还给事件循环。</strong>如果中间插入一段同步 CPU 代码（如 while 空转），事件循环会被卡住——心跳和 chunk 都无法按时执行：同步代码自己永远插不了队，还会堵死别人。</li>
+</ul>
 
 <h4>循环里的异步调度：串行 vs 并行（实测）</h4>
 <p>同一个 <code>await</code>，写在不同的循环结构里，调度行为完全不同——这是读 agent-loop.ts 工具执行代码的必备认知：</p>
@@ -2087,6 +2271,7 @@ function renderContent() {
   relocateDoneButtons(main);
   buildToc(main);
   renderQuizzes(main);
+  initEvlViz(main);
 
   main.querySelectorAll(".done-btn").forEach(btn => {
     const id = btn.dataset.section;
@@ -2565,6 +2750,90 @@ function highlightLessonCode(root) {
       codeEl.classList.add("hljs");
     } catch { /* 语言不支持则跳过 */ }
   });
+}
+
+// ===================== 事件循环可视化 =====================
+// 两个 async 函数的执行轨迹：一个等定时器（宏任务），一个等已完成 Promise（微任务）
+const EVL_STEPS = [
+  { note: "同步阶段开始：主程序调用 download()，进入函数，打印第一行。", stack: ["主程序", "download()"], micro: [], macro: [], log: ["A: 开始下载"] },
+  { note: "download 执行到 await sleep(500)：创建 Promise + 注册 500ms 定时器（宏任务队列），download 冻结在 await 点，剩余代码打包成续体，向主程序返回一个 pending Promise。", stack: ["主程序"], micro: [], macro: ["⏱ 定时器 500ms"], log: ["A: 开始下载"] },
+  { note: "主程序继续往下：调用 parse()，打印 B 的第一行。", stack: ["主程序", "parse()"], micro: [], macro: ["⏱ 定时器 500ms"], log: ["A: 开始下载", "B: 开始解析"] },
+  { note: "parse 执行到 await Promise.resolve()：Promise 已完成，所以续体直接进【微任务队列】，parse 冻结。", stack: ["主程序"], micro: ["parse 续体: log(B: 解析完成)"], macro: ["⏱ 定时器 500ms"], log: ["A: 开始下载", "B: 开始解析"] },
+  { note: "主程序最后一行：打印 C。", stack: ["主程序"], micro: ["parse 续体: log(B: 解析完成)"], macro: ["⏱ 定时器 500ms"], log: ["A: 开始下载", "B: 开始解析", "C: 同步代码结束"] },
+  { note: "同步代码全部跑完，调用栈清空。事件循环开始工作：先看微任务队列——微任务永远优先于宏任务。", stack: [], micro: ["parse 续体: log(B: 解析完成)"], macro: ["⏱ 定时器 500ms"], log: ["A: 开始下载", "B: 开始解析", "C: 同步代码结束"] },
+  { note: "取出微任务：parse 从 await 点恢复，打印 B: 解析完成，函数结束。", stack: [], micro: [], macro: ["⏱ 定时器 500ms"], log: ["A: 开始下载", "B: 开始解析", "C: 同步代码结束", "B: 解析完成"] },
+  { note: "微任务队列已空，定时器还没到点。事件循环等待中……（时间流逝）", stack: [], micro: [], macro: ["⏱ 定时器 500ms"], log: ["A: 开始下载", "B: 开始解析", "C: 同步代码结束", "B: 解析完成"] },
+  { note: "500ms 到！定时器回调进入宏任务队列。", stack: [], micro: [], macro: ["⏱ 定时器回调"], log: ["A: 开始下载", "B: 开始解析", "C: 同步代码结束", "B: 解析完成"] },
+  { note: "执行宏任务：定时器回调把 sleep 的 Promise 置为 fulfilled → download 的续体进入微任务队列。", stack: ["定时器回调"], micro: ["download 续体: log(A: 下载完成)"], macro: [], log: ["A: 开始下载", "B: 开始解析", "C: 同步代码结束", "B: 解析完成"] },
+  { note: "宏任务执行完，立即排空微任务：download 从 await 点恢复，打印 A: 下载完成。", stack: [], micro: [], macro: [], log: ["A: 开始下载", "B: 开始解析", "C: 同步代码结束", "B: 解析完成", "A: 下载完成"] },
+  { note: "所有队列清空，程序结束。回顾顺序铁律：同步代码 → 微任务 → 宏任务 → 新产生的微任务。", stack: [], micro: [], macro: [], log: ["A: 开始下载", "B: 开始解析", "C: 同步代码结束", "B: 解析完成", "A: 下载完成"] },
+];
+
+function initEvlViz(main) {
+  const root = main.querySelector("#evl-viz");
+  if (!root || root.dataset.ready) return;
+  root.dataset.ready = "1";
+  let cur = 0, timer = null;
+  root.innerHTML =
+    '<div class="evl">' +
+    '<div class="evl-note"><span class="evl-step-no"></span><span class="evl-note-text"></span></div>' +
+    '<div class="evl-controls">' +
+    '<button data-act="prev">← 上一步</button>' +
+    '<button data-act="next">下一步 →</button>' +
+    '<button data-act="auto">▶ 自动播放</button>' +
+    '<button data-act="reset">重置</button>' +
+    '</div>' +
+    '<div class="evl-grid">' +
+    '<div class="evl-panel"><div class="evl-panel-title">调用栈</div><div class="evl-items stack"></div></div>' +
+    '<div class="evl-panel"><div class="evl-panel-title">微任务队列（Promise 续体）</div><div class="evl-items micro"></div></div>' +
+    '<div class="evl-panel"><div class="evl-panel-title">宏任务队列（定时器等）</div><div class="evl-items macro"></div></div>' +
+    '</div>' +
+    '<div class="evl-log-title">输出日志</div>' +
+    '<div class="evl-log"></div>' +
+    '</div>';
+
+  const noteNo = root.querySelector(".evl-step-no");
+  const noteText = root.querySelector(".evl-note-text");
+  const stackEl = root.querySelector(".evl-items.stack");
+  const microEl = root.querySelector(".evl-items.micro");
+  const macroEl = root.querySelector(".evl-items.macro");
+  const logEl = root.querySelector(".evl-log");
+  const btns = root.querySelectorAll(".evl-controls button");
+
+  function renderStep() {
+    const s = EVL_STEPS[cur];
+    noteNo.textContent = "步骤 " + (cur + 1) + "/" + EVL_STEPS.length;
+    noteText.textContent = s.note;
+    const fill = (el, items, cls) => {
+      el.innerHTML = items.length
+        ? items.map((t) => `<div class="evl-item ${cls}">${t}</div>`).join("")
+        : '<div class="evl-empty">（空）</div>';
+    };
+    fill(stackEl, s.stack, "st");
+    fill(microEl, s.micro, "mi");
+    fill(macroEl, s.macro, "ma");
+    logEl.textContent = s.log.join("\n");
+    btns[0].disabled = cur === 0;
+    btns[1].disabled = cur === EVL_STEPS.length - 1;
+  }
+  function stopAuto() {
+    if (timer) { clearInterval(timer); timer = null; btns[2].textContent = "▶ 自动播放"; }
+  }
+  btns[0].onclick = () => { stopAuto(); if (cur > 0) { cur--; renderStep(); } };
+  btns[1].onclick = () => { stopAuto(); if (cur < EVL_STEPS.length - 1) { cur++; renderStep(); } };
+  btns[2].onclick = () => {
+    if (timer) return stopAuto();
+    if (cur >= EVL_STEPS.length - 1) cur = 0;
+    renderStep();
+    btns[2].textContent = "⏸ 暂停";
+    timer = setInterval(() => {
+      if (cur >= EVL_STEPS.length - 1) return stopAuto();
+      cur++;
+      renderStep();
+    }, 1800);
+  };
+  btns[3].onclick = () => { stopAuto(); cur = 0; renderStep(); };
+  renderStep();
 }
 
 // ===================== 章节测验 =====================
