@@ -22,3 +22,9 @@
 - TOC、scroll spy、hash 路由、完成状态全部由 id 自动派生，新增章节零配置
 - pre[data-playground] 自动出现"试一试"；ASCII 图加 data-lang="text"
 - 每节末尾有测验卡（QUIZZES 数据，纯概念题、不考 pi 源码），全部答对才解锁"标记完成"按钮；通过状态存 state.quiz。新增章节时必须配 2-4 道题；选项注意长度相近、答案位置打散、配解析（retrieval practice + 即时反馈）
+
+## 部署工作流（用户明确要求 2026-08-11）
+
+- 用户从飞书发消息让改网站时：**改完直接 commit + push + 用 ship-static-site skill 验证线上**，不要先问。用户在手机端看 GitHub Pages（https://sinex8.github.io/pi-learning-journey/），不推看不到
+- 本地服务器未必在跑：`./serve.sh` 起 localhost:8080；验证线上走代理 `--proxy=http://127.0.0.1:7892`
+- Pages 构建卡 building 时手动触发 `POST /pages/builds`（用 git credential fill 的 token）
