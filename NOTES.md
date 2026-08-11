@@ -28,3 +28,12 @@
 - 用户从飞书发消息让改网站时：**改完直接 commit + push + 用 ship-static-site skill 验证线上**，不要先问。用户在手机端看 GitHub Pages（https://sinex8.github.io/pi-learning-journey/），不推看不到
 - 本地服务器未必在跑：`./serve.sh` 起 localhost:8080；验证线上走代理 `--proxy=http://127.0.0.1:7892`
 - Pages 构建卡 building 时手动触发 `POST /pages/builds`（用 git credential fill 的 token）
+
+## 课程模板（用户要求 2026-08-11，/teach）
+
+第 3 课起，凡涉及 pi 源码的课程必须包含三段结构：
+1. **文件结构与代码入口**：源文件位置地图（目录树代码块）+ 入口函数 + 建议读码路线
+2. **代码架构与核心机制讲解**：正文主体
+3. **作业**：读码题 / 动手题 选一
+
+已落地：l1-s1（第 3 课）、lp-0（第 4 课）。后续 lesson-harness/product/evals 照此模板。

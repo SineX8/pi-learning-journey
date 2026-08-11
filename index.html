@@ -2214,6 +2214,27 @@ console.log("流结束");</code></pre></div>
   在 <code>runLoop</code> 里完全一样。本课只讲你手搓版大概率没有的工程细节。
 </div>
 
+<h3 id="l1-s1"><div class="section-head">文件结构与代码入口 <button class="done-btn" data-section="l1-s1">标记完成</button></div></h3>
+
+<p>读码先认地图。循环层的家在 <span class="file-ref">packages/agent/src/</span>，本课相关文件：</p>
+<div class="pre-wrap"><pre data-lang="text"><code>packages/agent/src/
+├── agent-loop.ts   ← 本课教材：纯循环函数（约 800 行）
+│                     导出 agentLoop / agentLoopContinue /
+│                     runAgentLoop / runAgentLoopContinue
+├── agent.ts        ← 有状态的 Agent 类：持有 AgentState 和消息历史，
+│                     对内包装 runAgentLoop
+├── stream-fn.ts    ← 默认 streamFn 注册点：循环靠它调到 provider 层
+├── types.ts        ← AgentEvent、AgentLoopConfig、AgentState 等类型
+└── index.ts        ← 包出口：export * from "./agent-loop.ts"</code></pre></div>
+<p><strong>代码入口</strong>：<code>runAgentLoop(config, sink)</code>。读码路线从外到内逐层展开：</p>
+<ol>
+  <li><code>runAgentLoop</code>（约 95 行）——一次性入口：准备好配置，启动循环并等它结束</li>
+  <li><code>agentLoop</code>（约 31 行）——创建事件流（EventStream），把循环本体 runLoop 跑起来</li>
+  <li><code>runLoop</code>（约 155 行）——循环本体：每轮流式收回复 → 执行工具 → 回填结果，直到 stopReason 不是 toolUse</li>
+  <li><code>streamAssistantResponse</code>（约 281 行）——一轮里的流式消费（第 2 课的 for await 在这）；<code>executeToolCalls</code>（约 411 行）——工具调度（串行/并行）</li>
+</ol>
+<p><strong>包的关系</strong>：循环层通过 <code>@earendil-works/pi-ai</code>（packages/ai）拿消息类型和 stream 契约，但它<strong>不认识任何具体 provider</strong>——谁翻译 OpenAI/Anthropic 的方言，是下一课的事。</p>
+
 <h3 id="l1-s2"><div class="section-head">手搓版大概率没有的 6 件事 <button class="done-btn" data-section="l1-s2">标记完成</button></div></h3>
 
 <h4>① 事件流是产品的边界（最重要的架构决策）</h4>
@@ -2289,7 +2310,30 @@ console.log("流结束");</code></pre></div>
   <div class="meta">教材：<span class="file-ref">packages/ai/src/types.ts</span> · <span class="file-ref">packages/ai/src/utils/event-stream.ts</span> · <span class="file-ref">packages/ai/src/api/lazy.ts</span> · <span class="file-ref">packages/ai/src/providers/faux.ts</span></div>
 </div>
 
-<h3 id="lp-1"><div class="section-head">1 · 为什么需要 Provider 抽象 <button class="done-btn" data-section="lp-1">标记完成</button></div></h3>
+<h3 id="lp-0"><div class="section-head">1 · 文件结构与代码入口 <button class="done-btn" data-section="lp-0">标记完成</button></div></h3>
+
+<p>读码先认地图。provider 层的家在 <span class="file-ref">packages/ai/src/</span>，本课相关的位置：</p>
+<div class="pre-wrap"><pre data-lang="text"><code>packages/ai/src/
+├── types.ts            ← 统一契约：ProviderStreams、AssistantMessageEvent、消息类型
+├── api/                ← 一家一个翻译模块（约 15 个）
+│   ├── openai-completions.ts    导出 stream / streamSimple
+│   ├── anthropic-messages.ts    同上
+│   ├── *.lazy.ts                每个模块配一个懒加载壳（全文一行）
+│   └── lazy.ts                  lazyApi / lazyStream 的实现
+├── providers/
+│   └── faux.ts         ← 假 provider：确定性测试用（第 7 节）
+└── utils/
+    └── event-stream.ts ← EventStream：push→pull 事件流桥（第 5 节）</code></pre></div>
+<p><strong>代码入口</strong>：每个 api 模块导出的 <code>stream(model, context, options)</code>。完整调用链：</p>
+<ol>
+  <li>agent-loop 的 <code>streamAssistantResponse</code>（第 3 课）要一份流式回复</li>
+  <li>→ streamFn 解析出该用哪个 provider 模块</li>
+  <li>→ <code>provider.stream(...)</code> 同步返回 AssistantMessageEventStream</li>
+  <li>→ 消费者 <code>for await</code> 统一事件</li>
+</ol>
+<p><strong>建议读码顺序</strong>：types.ts 的 ProviderStreams（契约）→ utils/event-stream.ts（流怎么流动）→ api/lazy.ts（壳）→ 任挑一个 api 模块看真实翻译（推荐 openai-completions.ts）。</p>
+
+<h3 id="lp-1"><div class="section-head">2 · 为什么需要 Provider 抽象 <button class="done-btn" data-section="lp-1">标记完成</button></div></h3>
 
 <p>第 3 课的 agent-loop 只想说一句话：<strong>"把消息历史发给模型，把回复流式给我"</strong>。但现实中每个 LLM 提供商的 API 都是一套方言——端点、JSON 结构、流式格式、鉴权方式全不同。看两家最真实的流式响应长什么样：</p>
 
@@ -2320,7 +2364,7 @@ else if (provider === "google")    { ...解析 candidates[0]... }
 
 <p>本课把这套抽象拆成四层：契约（接口长什么样）→ 事件词汇（流里流淌的是什么）→ EventStream（事件怎么流到消费者手里）→ lazy 与 faux（工程收尾：启动速度和可测试性）。</p>
 
-<h3 id="lp-2"><div class="section-head">2 · 统一契约：ProviderStreams <button class="done-btn" data-section="lp-2">标记完成</button></div></h3>
+<h3 id="lp-2"><div class="section-head">3 · 统一契约：ProviderStreams <button class="done-btn" data-section="lp-2">标记完成</button></div></h3>
 
 <p>"普通话"的语法定义在 <span class="file-ref">packages/ai/src/types.ts</span> 里，核心是一个接口：</p>
 
@@ -2359,7 +2403,7 @@ export interface ProviderStreams {
   <strong>设计要点：契约的价值不在"能调用"，在"可预期"。</strong>返回类型固定为 stream、错误固定走 error 事件——这两条让 agent-loop 对 15 个 provider 只写一套消费代码。好的抽象不是减少代码量，是减少<strong>情况数</strong>。
 </div>
 
-<h3 id="lp-3"><div class="section-head">3 · 统一事件词汇表：AssistantMessageEvent <button class="done-btn" data-section="lp-3">标记完成</button></div></h3>
+<h3 id="lp-3"><div class="section-head">4 · 统一事件词汇表：AssistantMessageEvent <button class="done-btn" data-section="lp-3">标记完成</button></div></h3>
 
 <p>契约规定了"返回一个 stream"，那 stream 里流淌的事件长什么样？types.ts 里是一个判别联合（discriminated union，第 1 课 §6）：</p>
 
@@ -2381,7 +2425,7 @@ export interface ProviderStreams {
 
 <p><code>done</code> 和 <code>error</code> 两个收尾事件携带的是<strong>最终完整消息</strong>（含 token 用量、stopReason）。你在第 3 课读的 <code>streamAssistantResponse</code> 就是消费这个 union 的大 switch——现在你知道它 case 的每一种事件是谁、按什么规范生产的了。</p>
 
-<h3 id="lp-4"><div class="section-head">4 · EventStream：你写过的桥的生产版 <button class="done-btn" data-section="lp-4">标记完成</button></div></h3>
+<h3 id="lp-4"><div class="section-head">5 · EventStream：你写过的桥的生产版 <button class="done-btn" data-section="lp-4">标记完成</button></div></h3>
 
 <p>stream 里的网络回调（SSE 一行行到达）是 <strong>push</strong>，agent-loop 的 <code>for await</code> 是 <strong>pull</strong>——这个矛盾你在第 2 课 §4 已经亲手解决过：WebSocket 包装器，缓冲区 + 唤醒插销。pi 的 <span class="file-ref">utils/event-stream.ts</span>（约 80 行）就是同一个模式的生产版，对照着读：</p>
 
@@ -2472,7 +2516,7 @@ console.log("result() 拿到全文:", await s.result());</code></pre></div>
 
 <p>运行它，你会看到第 2 课的所有概念在生产形态下团聚：异步生成器、push→pull 桥、<code>Symbol.asyncIterator</code>、流式消费的两种姿势。<strong>pi 的 EventStream 与这段代码的距离，只有"错误处理更全"和"等待者用队列"。</strong></p>
 
-<h3 id="lp-5"><div class="section-head">5 · lazy 加载：先给收据，后装子弹 <button class="done-btn" data-section="lp-5">标记完成</button></div></h3>
+<h3 id="lp-5"><div class="section-head">6 · lazy 加载：先给收据，后装子弹 <button class="done-btn" data-section="lp-5">标记完成</button></div></h3>
 
 <p>问题：api/ 下有 ~15 个 provider 模块，每个还有自己的依赖。如果 pi 启动时全部 import，启动会被拖慢——而你一次会话只用一个 provider。</p>
 
@@ -2503,7 +2547,7 @@ export const anthropicMessagesApi = (): ProviderStreams =&gt;
   <strong>注意错误处理的一致性：</strong>连"模块加载失败"这种启动期错误，也被翻译成 stream 里的 error 事件，而不是 throw。§2 的契约（失败永远走 error 通道）在系统的<strong>每一个边界</strong>都成立——这就是"可预期"的代价和收益：写实现的人处处小心，写消费的人永远省心。
 </div>
 
-<h3 id="lp-6"><div class="section-head">6 · faux provider：没有网络的确定性测试 <button class="done-btn" data-section="lp-6">标记完成</button></div></h3>
+<h3 id="lp-6"><div class="section-head">7 · faux provider：没有网络的确定性测试 <button class="done-btn" data-section="lp-6">标记完成</button></div></h3>
 
 <p>问题：怎么测试 agent-loop？真调 OpenAI 有三个死穴——<strong>贵</strong>（每次测试花钱）、<strong>慢</strong>（几秒一个用例）、<strong>不确定</strong>（同一 prompt 两次回答不同，断言没法写）。</p>
 
@@ -2523,7 +2567,7 @@ fauxAssistantMessage({ content: [fauxText("你好"), fauxToolCall("read", { path
   <strong>测试的哲学：</strong>测 agent harness 时，你测的是<strong>循环逻辑</strong>（工具有没有被调、结果有没有回填、循环有没有在 stopReason 处停下），不是模型智力。把模型换成确定性的剧本，harness 的行为才变成可断言的纯逻辑。第 7 课（evals）会整套建在这上面。
 </div>
 
-<h3 id="lp-hw"><div class="section-head">7 · 作业（选一即可） <button class="done-btn" data-section="lp-hw">标记完成</button></div></h3>
+<h3 id="lp-hw"><div class="section-head">8 · 作业（选一即可） <button class="done-btn" data-section="lp-hw">标记完成</button></div></h3>
 
 <div class="hw">
   <label><input type="checkbox" data-hw="lp-hw-1"> <strong>读码题</strong>：打开 <span class="file-ref">packages/ai/src/api/openai-completions.ts</span> 的 <code>stream</code> 函数（约 201 行起），找到 SSE 数据行被翻译成 <code>text_delta</code> 事件的位置。用三句话描述：HTTP 响应流 → 解析出的 JSON → 统一事件，这条链上各发生了什么。</label>
@@ -3302,6 +3346,14 @@ const QUIZZES = {
     { q: "流式响应的总时间为什么无法靠异步压缩？", options: ["Promise 的数量限制", "chunk 有内在顺序，后面的依赖前面的", "网络带宽是固定的", "语法不允许"], answer: 1, explain: "流式的收益在边到边用和不阻塞，不在总时间。" },
     { q: "[1,2,3].forEach(async (x) => await task(x)) 的问题是？", options: ["语法错误", "任务自动串行执行", "立即返回，任务并发飞出没人等", "必定内存泄漏"], answer: 2 },
   ],
+  "l1-s1": [
+    { q: "想读 agent 主循环，应该从哪个函数入口开始读？", options: ["runAgentLoop", "Agent 类的构造函数", "stream-fn.ts 的注册函数", "index.ts 的导出列表"], answer: 0, explain: "runAgentLoop 是一次性入口：runAgentLoop → agentLoop → runLoop，从外到内逐层展开。" },
+    { q: "packages/agent 与具体 LLM provider 的关系是？", options: ["通过 packages/ai 的统一契约间接调用，不认识具体 provider", "每个 provider 在 agent 包里有对应文件", "agent 包直接 import OpenAI 的 SDK", "provider 信息写死在 types.ts"], answer: 0, explain: "依赖单向：agent → pi-ai 契约；方言翻译全在 provider 模块里。" },
+  ],
+  "lp-0": [
+    { q: "packages/ai 里，统一契约（ProviderStreams、事件类型）定义在哪个文件？", options: ["types.ts", "api/lazy.ts", "providers/faux.ts", "utils/event-stream.ts"], answer: 0, explain: "types.ts 是全部抽象的类型定义；api/ 模块和 faux 都实现它。" },
+    { q: "谁调用 api 模块的 stream（provider 层的消费入口）？", options: ["agent-loop 的 streamAssistantResponse 经 streamFn 调到 provider.stream", "CLI 启动脚本直接调用", "EventStream 反向调用", "faux provider 代理转发"], answer: 0, explain: "调用链：streamAssistantResponse → streamFn → provider.stream → for await 消费。" },
+  ],
   "lp-1": [
     { q: "如果让 agent-loop 直接解析各家 API 的 SSE 格式，加一个新 provider 需要改哪里？", options: ["agent-loop 里多加一个 if/else 分支", "只新增一个独立的翻译模块", "修改统一事件类型的定义", "重写消息历史的结构"], answer: 0, explain: "不抽象，分支就长进心脏；抽象后新 provider = 新模块，loop 一行不动。" },
     { q: "把 provider 抽象类比成音频插件格式（VST3/AU/AAX），\"DAW 宿主\"对应的是？", options: ["LLM 提供商的服务器", "agent-loop 等消费方代码", "统一事件类型定义", "底层的网络传输层"], answer: 1, explain: "宿主只认统一插件接口；loop 只认 ProviderStreams 契约。" },
@@ -3332,32 +3384,6 @@ const QUIZZES = {
     { q: "agent 核心循环与 UI 之间推荐的耦合方式是？", options: ["UI 直接调核心的内部函数", "核心只发事件，UI 订阅事件流", "核心直接操作界面元素", "共享几个全局变量"], answer: 1, explain: "事件解耦让同一核心能接 TUI、Electron、测试三种消费者。" },
     { q: "模型输出被 token 上限截断时，其中的 tool call 应如何处理？", options: ["尽量执行能解析的", "静默忽略掉", "全部标记为错误不执行，反馈给模型重发", "让用户手动挑选"], answer: 2, explain: "截断的参数可能看起来合法但缺字段，执行风险大。" },
     { q: "工具执行出错（比如工具不存在）应该怎么处理？", options: ["抛异常终止整个 agent", "把错误转成 toolResult 喂回模型，让它自己纠正", "弹窗打断用户", "静默重试三次"], answer: 1, explain: "错误反馈给模型是 agent 自愈的关键。" },
-  ],
-  "lp-1": [
-    { q: "如果让 agent-loop 直接解析各家 API 的 SSE 格式，加一个新 provider 要改哪里？", options: ["agent-loop 里新加一个 if/else 分支", "只新增一个独立的翻译模块", "修改统一事件类型定义", "重写消息历史的存储结构"], answer: 0, explain: "不抽象则分支长进心脏；抽象后新 provider = 新模块，loop 不动。" },
-    { q: "Provider 抽象类比音频插件格式（VST/AU），\“DAW 宿主\”对应谁？", options: ["LLM 提供商的服务器", "agent-loop / 消费者代码", "统一事件类型定义", "网络传输层"], answer: 1, explain: "宿主只认统一插件接口；loop 只认 ProviderStreams 契约。" },
-  ],
-  "lp-2": [
-    { q: "api 模块从不写 implements ProviderStreams，凭什么算满足契约？", options: ["TS 结构类型：形状吻合即满足接口", "pi 运行时用反射逐字段检查", "bundler 硬编码了导出名单", "模块隐式继承 Provider 基类"], answer: 0, explain: "第 1 课的\“形状比名字重要\”在模块层面的应用。" },
-    { q: "StreamFunction 契约规定运行失败不允许 throw，而是？", options: ["重试三次后静默放弃", "把失败编码为 stream 里的 error 事件", "直接退出进程", "返回 null 让调用方猜"], answer: 1, explain: "流的失败发生在未来任意时刻，throw 接不住；error 事件是统一通道。" },
-    { q: "stream 为什么返回 EventStream 而不是 Promise<AssistantMessage>？", options: ["Promise 不支持泛型消息", "流式要边到边用，等全部完成就失去意义", "EventStream 更省内存", "历史遗留，本可以改"], answer: 1, explain: "第 2 课的流式收益：300ms 拿到第一个 chunk。" },
-  ],
-  "lp-3": [
-    { q: "text_start / text_delta / text_end 三段式里，contentIndex 的作用是？", options: ["记录事件的毫秒时间戳", "标识事件属于消息里第几块内容", "统计全文的 token 数", "给乱序的 delta 去重"], answer: 1, explain: "文本/思考/工具调用可交错，index 区分事件属于哪块。" },
-    { q: "为什么每个事件都带 partial 快照，而不只发 delta？", options: ["消费者任何时刻直接拿到当前完整消息，不用自己拼", "partial 用于断线重连", "防止 delta 乱序到达", "冗余设计，可删掉"], answer: 0, explain: "TUI 每帧拿 partial 直接渲染；拼 delta 的样板代码不外泄。" },
-  ],
-  "lp-4": [
-    { q: "EventStream 和第 2 课你写的 toAsyncIterable 共享的核心模式是？", options: ["发布订阅 + 正则路由", "push→pull 桥：缓冲区 + 唤醒挂起的消费者", "Promise 链式拼接", "定时器轮询队列"], answer: 1, explain: "回调推入、for await 拉取，队列和等待者在中间衔接。" },
-    { q: "EventStream 的 result() 解决什么问题？", options: ["流结束后直接拿到最终完整消息，不必自己维护累积状态", "取消进行中的请求", "把流重置回开头重播", "查询每个事件的时间戳"], answer: 0, explain: "isComplete/extractResult 从 done/error 事件提取最终结果。" },
-  ],
-  "lp-5": [
-    { q: "lazyApi(() => import(\“./anthropic-messages.ts\”)) 把模块加载推迟到？", options: ["第一次调用 stream 时", "进程启动时", "用户切换模型时", "编译打包时"], answer: 0, explain: "启动不被十几个 provider 模块拖慢；import 缓存让后续调用零成本。" },
-    { q: "契约要求 stream() 同步返回 stream，但模块加载是异步的。lazyStream 怎么调和？", options: ["阻塞主线程直到加载完成", "先同步返回空 stream，加载完把内层事件逐个转发进去", "先返 Promise 再换成真 stream", "跳过加载返回假数据"], answer: 1, explain: "消费者立刻拿到句柄开始 for await，事件在加载完成后才流入。" },
-    { q: "lazyStream 里模块加载失败会怎样？", options: ["throw 异常让调用方 try/catch", "进程崩溃提示装依赖", "往 stream 推一个 error 事件，走统一错误通道", "静默重试直到成功"], answer: 2, explain: "契约在每个边界都成立：失败永远以 error 事件出现。" },
-  ],
-  "lp-6": [
-    { q: "测 agent loop 不用真 API 的根本原因是？", options: ["真 API 没有测试模式", "输出不确定导致断言没法写，且贵、慢、要网络", "faux provider 更快所以更好", "真 API 会泄露密钥"], answer: 1, explain: "测的是 harness 逻辑不是模型智力；确定性才能写断言。" },
-    { q: "FauxResponseFactory（看 context 再决定回什么的函数）用来模拟？", options: ["依赖对话历史的分支行为，如第二轮才调用工具", "网络延迟抖动", "token 计费误差", "模型的创造性"], answer: 0, explain: "静态剧本不够时，工厂函数根据收到的消息动态生成响应。" },
   ],
 };
 
