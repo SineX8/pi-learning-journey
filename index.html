@@ -506,6 +506,8 @@
   }
   .tl-lane.blue .tl-ev { background: var(--accent); box-shadow: 0 0 0 3px rgba(88,166,255,.18); }
   .tl-lane.green .tl-ev { background: var(--green); box-shadow: 0 0 0 3px rgba(63,185,80,.18); }
+  .tl-lane.red .tl-line { background: rgba(248,81,73,.35); }
+  .tl-lane.red .tl-ev-label { border-color: rgba(248,81,73,.5); color: var(--red); }
   .tl-ev-label {
     position: absolute; bottom: 17px; left: 50%; transform: translateX(-50%);
     white-space: nowrap; font-size: 13px; padding: 2px 8px; border-radius: 6px;
@@ -520,6 +522,13 @@
     border: 2px solid var(--orange); background: var(--bg);
     transform: translate(-50%,-50%);
   }
+  .tl-run {
+    position: absolute; top: 50%; left: var(--x);
+    width: 9px; height: 26px; border-radius: 4px;
+    transform: translate(-50%,-50%);
+    background: var(--red); box-shadow: 0 0 0 3px rgba(248,81,73,.15);
+  }
+  .tl-run.wide { width: 34px; }
   .tl-track-note {
     position: absolute; top: calc(50% + 13px); left: var(--x);
     transform: translateX(-50%); white-space: nowrap;
@@ -530,6 +539,7 @@
   .tl-legend .b { color: var(--accent); }
   .tl-legend .g { color: var(--green); }
   .tl-legend .o { color: var(--orange); }
+  .tl-legend .r { color: var(--red); }
 </style>
 </head>
 <body>
@@ -1682,7 +1692,7 @@ console.log("2: 调用后同步代码");
 console.log("[最终]: " + text);     // ← 这行就不可能执行
 // "最终"是 await ticker 的续体：不是"碰巧"最后打印，
 // 是 ticker 的 Promise fulfilled 之后，它才有资格被排上队</code></pre></div>
-<p>那"让出"到底让出了什么？<strong>让出的是线程</strong>——冻结期间线程去跑别的任务。交错只发生在<strong>不同任务之间</strong>；每个任务内部顺序纹丝不动。第 3 节的心跳 demo 会让你看到两根任务进度条的交错。</p>
+<p>那"让出"到底让出了什么？<strong>让出的是线程</strong>——冻结期间线程去跑别的任务。交错只发生在<strong>不同任务之间</strong>；每个任务内部顺序纹丝不动。第 3 节的心跳 demo 让你看到两个任务的交错，第 4 节的时序图会把它画成三条道——两条任务道，加一条"线程此刻在谁手里"的道。</p>
 <div class="callout key">
   <strong>推论：想判断你的代码何时执行，只需数它前面有几个 await、各自在等什么 Promise</strong>——顺序信息全在代码里，没有隐藏的并发陷阱。
 </div>
@@ -2007,7 +2017,7 @@ console.log("[" + el() + "] 最终: " + text);
 // 这就是"不阻塞"的含义：总时间没变，等待时间不再浪费。</code></pre></div>
 
 <h4>执行时序图：心跳如何插进 chunk 的等待空档</h4>
-<p>把上面代码的 1.2 秒画成时间轴——两个任务在同一个事件循环上的真实交错顺序（窄屏可左右滑动）：</p>
+<p>把上面代码的 1.2 秒画成时间轴。<strong>三条道</strong>：蓝、绿是两条任务道；<strong>红道回答一个关键问题——每一刻线程在谁手里</strong>。看不懂"空档"，往往就是因为只盯着任务、没看线程（窄屏可左右滑动）：</p>
 <div class="tl-scroll">
   <div class="tl">
     <div class="tl-ruler">
@@ -2031,10 +2041,10 @@ console.log("[" + el() + "] 最终: " + text);
         <span class="tl-yield" style="--x:calc(25% + 10px)"></span>
         <span class="tl-yield" style="--x:calc(50% + 10px)"></span>
         <span class="tl-yield" style="--x:calc(75% + 10px)"></span>
-        <div class="tl-ev" style="--x:25%"><span class="tl-ev-label">300ms 收到"你好"</span></div>
-        <div class="tl-ev" style="--x:50%"><span class="tl-ev-label">600ms 收到"，我是"（先）</span></div>
-        <div class="tl-ev" style="--x:75%"><span class="tl-ev-label">900ms 收到" pi"</span></div>
-        <div class="tl-ev" style="--x:100%"><span class="tl-ev-label end">1200ms 收到"。"→ 最终输出</span></div>
+        <div class="tl-ev" style="--x:25%"><span class="tl-ev-label">收到"你好"</span></div>
+        <div class="tl-ev" style="--x:50%"><span class="tl-ev-label">收到"，我是"（先）</span></div>
+        <div class="tl-ev" style="--x:75%"><span class="tl-ev-label">收到" pi"</span></div>
+        <div class="tl-ev" style="--x:100%"><span class="tl-ev-label end">收到"。"→ 最终输出</span></div>
         <span class="tl-track-note" style="--x:37.5%">空档里 await 挂起，线程还给事件循环</span>
       </div>
     </div>
@@ -2052,20 +2062,46 @@ console.log("[" + el() + "] 最终: " + text);
         <span class="tl-yield" style="--x:calc(33.33% + 10px)"></span>
         <span class="tl-yield" style="--x:calc(50% + 10px)"></span>
         <span class="tl-yield" style="--x:calc(66.67% + 10px)"></span>
-        <div class="tl-ev" style="--x:16.67%"><span class="tl-ev-label">200ms 心跳1</span></div>
-        <div class="tl-ev" style="--x:33.33%"><span class="tl-ev-label">400ms 心跳2</span></div>
-        <div class="tl-ev" style="--x:50%"><span class="tl-ev-label">600ms 心跳3（同刻·后）</span></div>
-        <div class="tl-ev" style="--x:66.67%"><span class="tl-ev-label">800ms 心跳4</span></div>
-        <div class="tl-ev" style="--x:83.33%"><span class="tl-ev-label">1000ms 心跳5</span></div>
+        <div class="tl-ev" style="--x:16.67%"><span class="tl-ev-label">心跳1</span></div>
+        <div class="tl-ev" style="--x:33.33%"><span class="tl-ev-label">心跳2</span></div>
+        <div class="tl-ev" style="--x:50%"><span class="tl-ev-label">心跳3（同刻·后）</span></div>
+        <div class="tl-ev" style="--x:66.67%"><span class="tl-ev-label">心跳4</span></div>
+        <div class="tl-ev" style="--x:83.33%"><span class="tl-ev-label">心跳5</span></div>
         <span class="tl-track-note" style="--x:25%">心跳的 200ms 定时器在 chunk 的空档里到点</span>
+      </div>
+    </div>
+    <div class="tl-lane red">
+      <div class="tl-lane-label">线程<br>谁占着它</div>
+      <div class="tl-track">
+        <div class="tl-line"></div>
+        <div class="tl-run wide" style="--x:2%"><span class="tl-ev-label" style="left:0;transform:none">主脚本同步跑完</span></div>
+        <div class="tl-run" style="--x:16.67%"></div>
+        <div class="tl-run" style="--x:25%"></div>
+        <div class="tl-run" style="--x:33.33%"></div>
+        <div class="tl-run" style="--x:calc(50% - 7px)"><span class="tl-ev-label">两块贴一起：先循环体，后心跳3的 log</span></div>
+        <div class="tl-run" style="--x:calc(50% + 7px)"></div>
+        <div class="tl-run" style="--x:66.67%"></div>
+        <div class="tl-run" style="--x:75%"></div>
+        <div class="tl-run" style="--x:83.33%"></div>
+        <div class="tl-run" style="--x:calc(100% - 5px)"></div>
+        <span class="tl-track-note" style="--x:9%">空闲</span>
+        <span class="tl-track-note" style="--x:20.8%">空闲</span>
+        <span class="tl-track-note" style="--x:29.2%">空闲</span>
+        <span class="tl-track-note" style="--x:41.7%">空闲</span>
+        <span class="tl-track-note" style="--x:58.3%">空闲</span>
+        <span class="tl-track-note" style="--x:70.8%">空闲</span>
+        <span class="tl-track-note" style="--x:79.2%">空闲</span>
+        <span class="tl-track-note" style="--x:91.7%">空闲</span>
       </div>
     </div>
   </div>
 </div>
 <ul class="tl-legend">
   <li><span class="b">●</span> 蓝道 = for await 消费流：每 300ms 到货一个 chunk，总耗时 1200ms 不可压缩；<span class="g">●</span> 绿道 = ticker：每 200ms 一次心跳。<span class="o">○</span> 空心点 = await 让出控制权、等定时器到点。</li>
-  <li>t≈600ms 两个定时器同刻到期：chunk 定时器先登记先执行，所以先"收到，我是"再"心跳3"。总耗时仍是 1200ms，但心跳的 5 次工作被"免费"塞进了 chunk 的等待空档。</li>
-  <li><strong>能插队的前提：两个任务都是 async 函数，await 会挂起自己、把线程还给事件循环。</strong>如果中间插入一段同步 CPU 代码（如 while 空转），事件循环会被卡住——心跳和 chunk 都无法按时执行：同步代码自己永远插不了队，还会堵死别人。</li>
+  <li><span class="r">▮</span> <strong>红道 = 线程在谁手里</strong>：实心块是同步代码正在执行——0ms 主脚本、每个 chunk 到达后的循环体（<code>text += chunk</code>、<code>console.log</code>）、每次心跳的 log。每块实际只有几微秒，画宽了才看得见。<strong>同一时刻永远只有一块在跑</strong>——这就是"单线程"的全部含义。</li>
+  <li>红道上实心块之间的大片"空闲"才是等待空档的真相：<strong>不是线程陪着 chunk 干等，是线程被完全让出来了</strong>，事件循环可以把任何到点的任务塞进来。心跳不是插进流式任务的内部，而是插进这些线程空闲段。</li>
+  <li>t≈600ms 两个定时器同刻到期：chunk 定时器先登记先执行，所以先"收到，我是"再"心跳3"。总耗时仍是 1200ms，但心跳的 5 次工作被"免费"塞进了线程空闲段。</li>
+  <li><strong>反面：如果某段同步代码不是几微秒而是 200ms（如 while 空转），红道上就是一个横跨 16% 的实心长块</strong>——期间心跳和 chunk 全部推迟，谁都插不了队。能交错的前提是两个任务都是 async 函数，await 会挂起自己、把线程还回去。</li>
 </ul>
 
 <h4>循环里的异步调度：串行 vs 并行（实测）</h4>
