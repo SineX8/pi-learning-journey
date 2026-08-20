@@ -1435,6 +1435,19 @@ type SpectrumReport = AnalysisResult&lt;{ bands: number[]; centroid: number }&gt
   设计自己的领域模型时先问："我能枚举所有变体吗？"
 </div>
 
+<h4>追问：interface 还能有参数？（Q&A 实录）</h4>
+<p><strong>能——尖括号里的是类型参数：填进去的是类型，不是值。</strong>你一直在用带参数的类型：<code>Array&lt;string&gt;</code>、<code>Map&lt;string, number&gt;</code>、<code>Promise&lt;X&gt;</code>、<code>Record&lt;string, T&gt;</code> 全是。</p>
+<p>把"泛型 = 给类型系统写的函数"坐实：</p>
+<div class="pre-wrap"><pre><code>// 值的世界：函数接收值，返回值
+function makeTool(name: string, params: object) { ... }
+makeTool("read", { path: "a.ts" })
+
+// 类型的世界：interface 接收类型，返回类型（编译期）
+interface ToolDefinition<TParams, TDetails, TState> { ... }
+type ReadTool = ToolDefinition<ReadSchema, unknown, any>  // ← "调用"它</code></pre></div>
+<p><code>interface ToolDefinition&lt;A, B, C&gt;</code> 定义的不是一个类型，而是一台<strong>"类型制造机"</strong>：不填参数它只是模板；填三个类型进去才产出一个具体的 interface 形状。整个"调用"发生在编译期，运行时一行不剩。</p>
+<p>为什么 interface 需要参数？它描述的是<strong>骨架固定、细节可变</strong>的结构——所有工具都有 name/label/execute，但每个工具的 params 类型不同。不留参数只有两条烂路：每个工具抄一遍 interface，或全标 any 放弃检查。和函数参数的存在理由一模一样：<strong>把变化的部分抽成参数，骨架只写一遍</strong>。能带类型参数的不只是 interface：<code>type</code> 别名、class、function、方法都行。</p>
+
 <h4>追问：<code>&lt;TParams extends TSchema = TSchema, TDetails = unknown, TState = any&gt;</code> 这种参数列表怎么读？（Q&A 实录）</h4>
 <p>pi 的真实代码（<span class="file-ref">coding-agent/src/core/extensions/types.ts</span> 的 <code>ToolDefinition</code>）。三个参数各演示一个语法点：</p>
 <div class="pre-wrap"><pre><code>interface ToolDefinition<
