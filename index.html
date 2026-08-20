@@ -1435,6 +1435,28 @@ type SpectrumReport = AnalysisResult&lt;{ bands: number[]; centroid: number }&gt
   设计自己的领域模型时先问："我能枚举所有变体吗？"
 </div>
 
+<h4>追问：<code>&lt;TParams extends TSchema = TSchema, TDetails = unknown, TState = any&gt;</code> 这种参数列表怎么读？（Q&A 实录）</h4>
+<p>pi 的真实代码（<span class="file-ref">coding-agent/src/core/extensions/types.ts</span> 的 <code>ToolDefinition</code>）。三个参数各演示一个语法点：</p>
+<div class="pre-wrap"><pre><code>interface ToolDefinition<
+  TParams extends TSchema = TSchema,  // ① 约束 + 默认
+  TDetails = unknown,                 // ② 只有默认
+  TState = any                        // ③ 只有默认（历史包袱）
+> { ... }</code></pre></div>
+<ul>
+  <li><strong><code>extends</code> 在尖括号里 = 约束，不是继承</strong>："TParams 必须是 TSchema 的子类型"（TSchema 是 TypeBox 的 schema 基类——该参数只接受 schema 类型）。class 语境里的 extends 才是继承。</li>
+  <li><strong><code>= X</code> = 默认类型实参</strong>：使用处不写尖括号时自动取它。和函数默认参数同构，<strong>约束和默认可以组合</strong>。</li>
+  <li><strong>参数在接口内部全局可见</strong>：<code>parameters: TParams</code>、<code>execute(params: Static<TParams>)</code>——整个 interface 的字段都能引用这三个参数。</li>
+</ul>
+<p><strong>为什么这样设计——参数之间是联动的：</strong></p>
+<div class="pre-wrap"><pre><code>defineTool({
+  name: "read",
+  parameters: Type.Object({ path: Type.String() }),  // TParams 从这里推断出来
+  execute: async (id, params) => {
+    params.path  // TS 知道有 path: string——因为 params 的类型是 Static<TParams>
+  }
+})</code></pre></div>
+<p><code>Static<TParams></code> 是 TypeBox 的类型级函数：把 schema 类型映射回数据类型。于是<strong>写一份 schema，同时得到运行时校验和编译期类型</strong>。约束保证这个联动成立（必须是 schema 才能 Static），默认值让简单场景不用手写尖括号。</p>
+
 <h3 id="ts-s11"><div class="section-head">12 · 类型的真相：编译期存在，运行时消失 <button class="done-btn" data-section="ts-s11">标记完成</button></div></h3>
 
 <p>第 3 节已经证明了核心事实：<strong>类型在编译后全部蒸发，运行时一行不剩</strong>。类型部分收尾前，本节回答它留下的两个工程问题：</p>
